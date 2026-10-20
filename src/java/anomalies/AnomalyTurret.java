@@ -23,8 +23,8 @@ public class AnomalyTurret extends PowerTurret {
    static final Color cCore = Color.valueOf("fff8d0");
    static final float glowBack = 2.5F;
    static final float FLASH = 26.0F;
-   static final float[] BUMP_F = new float[]{-4.9F, -4.9F, -7.1F};
-   static final float[] BUMP_R = new float[]{-4.1F, 3.8F, -0.15F};
+   static final float[] BUMP_F = new float[]{-7.125F, -7.125F, -4.125F, -4.125F};
+   static final float[] BUMP_R = new float[]{-5.375F, 5.375F, -5.125F, 5.125F};
    static final BallLightningAnomaly fx = new BallLightningAnomaly();
    TextureRegion glowRegion;
 
@@ -126,7 +126,7 @@ public class AnomalyTurret extends PowerTurret {
             float var10 = Mathf.cosDeg(this.rotation);
             float var11 = Mathf.sinDeg(this.rotation);
 
-            for(int var12 = 0; var12 < 3; ++var12) {
+            for(int var12 = 0; var12 < BUMP_F.length; ++var12) {
                float var13 = TurretPatch.arcBegin(var12) - var2;
                float var14 = AnomalyTurret.BUMP_R[var12];
                float var15 = this.x + var10 * var13 + var11 * var14;

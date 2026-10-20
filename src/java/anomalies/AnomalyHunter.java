@@ -25,7 +25,7 @@ public class AnomalyHunter extends UnitType {
    static final Color rift = Color.valueOf("58FFF9");
    static final Color riftCore = Color.valueOf("d2fffc");
    static final float laserRange = 110.0F;
-   static final float killTime = 150.0F;
+   static final float killTime = 1160.0F;
    static final float muzzle = 7.0F;
    static final float[][] coils = new float[][]{{-1.3F, 5.7F}, {1.3F, 5.7F}, {-6.7F, 0.3F}, {6.7F, 0.3F}, {-5.6F, -5.3F}, {5.6F, -5.3F}};
    static final int[][] links = new int[][]{{0, 2}, {2, 4}, {1, 3}, {3, 5}};
@@ -216,7 +216,7 @@ public class AnomalyHunter extends UnitType {
                this.unit.rotation = Angles.moveToward(this.unit.rotation, var7, this.unit.type.rotateSpeed * Time.delta);
                boolean var1 = var6 <= 121.0F && Angles.angleDist(this.unit.rotation, var7) < 25.0F;
                if (var1) {
-                  this.beam = Math.min(150.0F, this.beam + Time.delta);
+                  this.beam = Math.min(AnomalyHunter.killTime, this.beam + Time.delta);
                   this.state[0] = this.target.x;
                   this.state[1] = this.target.y;
                   this.state[2] = Math.min(1.0F, this.beam / 20.0F);
@@ -226,7 +226,7 @@ public class AnomalyHunter extends UnitType {
                   AnomalyHunter.beams.remove(this.unit);
                }
 
-               if (this.beam >= 150.0F) {
+               if (this.beam >= AnomalyHunter.killTime) {
                   if (this.target instanceof MirrorAnomaly && ((MirrorAnomaly)this.target).team != null) {
                      this.target.dead = true;
                   } else {

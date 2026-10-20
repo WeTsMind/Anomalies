@@ -6,6 +6,10 @@ public class Spacing {
    public static final int GAP = 4;
 
    public static boolean ok(int var0, int var1, int var2) {
+      if (AnomalyProtector.blocks(var0, var1, var2)) {
+         return false;
+      }
+
       Seq var3 = AnomalyManager.list;
 
       for(int var4 = 0; var4 < var3.size; ++var4) {

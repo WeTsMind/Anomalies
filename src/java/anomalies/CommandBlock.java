@@ -79,6 +79,10 @@ public class CommandBlock extends Block {
                var0x.add(Core.bundle.get("anomalies.interval", "Roll every, sec"));
                var0x.field(String.valueOf(AnomalySettings.interval()), (sv) -> AnomalyNet.set("anom.interval", String.valueOf(Math.max(1, Strings.parseInt(sv, AnomalySettings.interval()))))).width(70.0F);
             }).colspan(3).row();
+            var0.table((var0x) -> {
+               var0x.add(Core.bundle.get("anomalies.count", "Rolls per interval (amount)"));
+               var0x.field(String.valueOf(AnomalySettings.count()), (sv) -> AnomalyNet.set("anom.count", String.valueOf(Math.max(1, Math.min(50, Strings.parseInt(sv, AnomalySettings.count())))))).width(70.0F);
+            }).colspan(3).row();
             var0.button("", Styles.togglet, () -> AnomalyNet.set("anom.destroy", AnomalySettings.destroyWorld() ? "0" : "1")).update((var0x) -> {
                String var10001 = Core.bundle.get("anomalies.worlddestroy", "World destruction");
                var0x.setText(var10001 + ": " + UiHint.onOff(AnomalySettings.destroyWorld()));

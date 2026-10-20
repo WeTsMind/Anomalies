@@ -72,7 +72,7 @@ public class TurretPatch {
    }
 
    public static float arcBegin(int var0) {
-      float var1 = clamp01(prog * 3.0F - (float)var0);
+      float var1 = clamp01(prog * (float)AnomalyTurret.BUMP_F.length - (float)var0);
       var1 = var1 * var1 * (3.0F - 2.0F * var1);
       arcF = Math.max(Math.max(curFade, 0.0F), var1);
       return AnomalyTurret.BUMP_F[var0];

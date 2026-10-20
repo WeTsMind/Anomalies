@@ -189,6 +189,10 @@ public class RulesHook {
          var0x.add(tr("anomalies.interval", "Roll every, sec"));
          var0x.field(String.valueOf(AnomalySettings.interval()), (sv) -> AnomalySettings.setInterval(Strings.parseInt(sv, AnomalySettings.interval()))).width(70.0F);
       }).colspan(3).row();
+      var0.table((var0x) -> {
+         var0x.add(tr("anomalies.count", "Rolls per interval (amount)"));
+         var0x.field(String.valueOf(AnomalySettings.count()), (sv) -> AnomalySettings.setCount(Strings.parseInt(sv, AnomalySettings.count()))).width(70.0F);
+      }).colspan(3).row();
       Label var7 = new Label(tr("anomalies.help", ""));
       var7.setWrap(true);
       var0.add(var7).width(300.0F).colspan(3).left().row();

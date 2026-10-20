@@ -24,6 +24,10 @@ public class AnomalyMod extends Mod {
    public static UnitType hunter;
    public static Item polcim;
    public static Block polcimOre;
+   public static Block denseGrass;
+   public static Block dryGrass;
+   public static Block desertBush;
+   public static Block cabbage;
 
    public void loadContent() {
       tzinch = new TzinchBlock("tzinch-block");
@@ -49,6 +53,12 @@ public class AnomalyMod extends Mod {
       };
       polcimOre = new OreBlock("polcim-ore", polcim);
       ((Floor)polcimOre).variants = 1;
+      denseGrass = new Floor("dense-grass", 3);
+      denseGrass.mapColor = Color.valueOf("65b582");
+      dryGrass = new Floor("dry-grass", 3);
+      dryGrass.mapColor = Color.valueOf("f9cb7d");
+      desertBush = new BushProp("desert-bush", 10, 0.4F, 32.0F, 6.0F, true);
+      cabbage = new BushProp("cabbage", 4, 1.2F, 16.5F, 14.0F, false);
    }
 
    public void init() {

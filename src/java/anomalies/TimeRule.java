@@ -61,13 +61,6 @@ public class TimeRule {
       } catch (Throwable var3) {
       }
 
-      try {
-         var0.row();
-         Label var1 = new Label(Core.bundle.get("anomalies.help", "Hints"));
-         var1.setWrap(true);
-         var0.add(var1).width(250.0F).left();
-      } catch (Throwable var2) {
-      }
 
    }
 

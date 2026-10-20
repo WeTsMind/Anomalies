@@ -20,6 +20,15 @@ public class AnomalySettings {
       Vars.state.rules.tags.put("anom.interval", String.valueOf(Math.max(1, var0)));
    }
 
+   /** How many times every anomaly type is rolled each interval. */
+   public static int count() {
+      return geti("anom.count", 1, 1, 50);
+   }
+
+   public static void setCount(int var0) {
+      Vars.state.rules.tags.put("anom.count", String.valueOf(Math.max(1, Math.min(50, var0))));
+   }
+
    public static boolean enabled() {
       return !"0".equals(Vars.state.rules.tags.get("anom.enabled"));
    }
@@ -47,10 +56,14 @@ public class AnomalySettings {
 
    static void roll() {
       if (enabled()) {
-         for(AnomalyType var3 : AnomalyType.all) {
-            int var4 = chance(var3);
-            if (var4 > 0 && Mathf.random(100.0F) < (float)var4) {
-               AnomalyManager.spawnRandom(var3);
+         int var0 = count();
+
+         for(int var1 = 0; var1 < var0; ++var1) {
+            for(AnomalyType var3 : AnomalyType.all) {
+               int var4 = chance(var3);
+               if (var4 > 0 && Mathf.random(100.0F) < (float)var4) {
+                  AnomalyManager.spawnRandom(var3);
+               }
             }
          }
 
