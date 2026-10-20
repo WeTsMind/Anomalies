@@ -1,0 +1,10 @@
+{
+  name: anomalies
+  displayName: Anomalies
+  author: "WeT & Claude"
+  main: anomalies.AnomalyModFixed
+  description: "A mod made with Claude that adds anomalies to the Mindustry world"
+  version: "1.3.0"
+  minGameVersion: "154"
+  java: true
+}
