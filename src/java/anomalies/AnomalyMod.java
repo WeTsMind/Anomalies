@@ -21,6 +21,7 @@ public class AnomalyMod extends Mod {
    public static Block tzinch;
    public static Block projector;
    public static Block command;
+   public static Block wallBreaker;
    public static UnitType hunter;
    public static Item polcim;
    public static Block polcimOre;
@@ -33,6 +34,7 @@ public class AnomalyMod extends Mod {
       tzinch = new TzinchBlock("tzinch-block");
       projector = new RiftProjector("rift-projector");
       command = new CommandBlock2("command-block");
+      wallBreaker = new WallBreaker("wall-breaker");
       hunter = new AnomalyHunter("hunter");
       polcim = new Item("polcim", Color.valueOf("5aa8ff")) {
          {
