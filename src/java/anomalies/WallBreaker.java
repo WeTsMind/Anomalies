@@ -102,7 +102,7 @@ public class WallBreaker extends Block {
          // Sprite is drawn facing up, so offset by -90 from Mindustry's default (right).
          Draw.rect(this.block.region, this.x, this.y, this.rotdeg() - 90.0F);
          Draw.z(Layer.block + 0.1F);
-         Draw.rect(this.sawRegion, this.x, this.y, this.sawAngle);
+         Draw.rect(WallBreaker.this.sawRegion, this.x, this.y, this.sawAngle);
          Draw.reset();
       }
 
