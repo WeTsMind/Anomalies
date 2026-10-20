@@ -5,10 +5,12 @@ import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
+import arc.util.Eachable;
 import arc.util.Time;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
 import mindustry.content.Items;
+import mindustry.entities.units.BuildPlan;
 import mindustry.gen.Building;
 import mindustry.graphics.Layer;
 import mindustry.type.Category;
@@ -33,6 +35,12 @@ public class RiftProjector extends Block {
       this.requirements(Category.effect, BuildVisibility.shown, ItemStack.with(new Object[]{Items.silicon, 50, Items.titanium, 30}));
       this.consumePower(1.5F);
       this.buildType = () -> new RiftBuild();
+   }
+
+   // The sprite faces up, so the placement preview needs the same -90 offset as draw() below.
+   @Override
+   public void drawPlanRegion(BuildPlan plan, Eachable<BuildPlan> list) {
+      Draw.rect(this.region, plan.drawx(), plan.drawy(), (float)plan.rotation * 90.0F - 90.0F);
    }
 
    public class RiftBuild extends Building {
