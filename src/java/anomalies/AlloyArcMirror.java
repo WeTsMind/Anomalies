@@ -1,12 +1,61 @@
 package anomalies;
 
 import mindustry.gen.Bullet;
+import mindustry.gen.Groups;
+import mindustry.gen.Unit;
 
 public class AlloyArcMirror extends MirrorAnomaly {
    static final float UNIT_BACK = 13.0F;
    static final float EXTRA_ARC = 6.0F;
    static final float EXTRA_OUT = 12.0F;
    private float baseRot;
+   /** Unit this shield is attached to (null on clients until found). */
+   Unit owner;
+   private final float[] anchorTmp = new float[3];
+
+   /** Pins the shield to the owner's current position/rotation so it never lags behind the unit. */
+   private void sync() {
+      if (this.owner != null && (!this.owner.isValid() || !(this.owner.type instanceof AlloyUnit))) {
+         this.owner = null;
+      }
+
+      if (this.owner == null && this.team != null) {
+         Unit best = null;
+         float bd = 48.0F * 48.0F;
+
+         for(int i = 0; i < Groups.unit.size(); ++i) {
+            Unit u = Groups.unit.index(i);
+            if (u.team == this.team && u.type instanceof AlloyUnit) {
+               float dx = u.x - this.x;
+               float dy = u.y - this.y;
+               float d = dx * dx + dy * dy;
+               if (d < bd) {
+                  bd = d;
+                  best = u;
+               }
+            }
+         }
+
+         this.owner = best;
+      }
+
+      if (this.owner != null) {
+         AlloyUnit.anchor(this.owner, this.anchorTmp);
+         this.x = this.anchorTmp[0];
+         this.y = this.anchorTmp[1];
+         this.rotation = this.anchorTmp[2];
+      }
+   }
+
+   public void update() {
+      this.sync();
+      super.update();
+   }
+
+   public void draw() {
+      this.sync();
+      super.draw();
+   }
 
    public AlloyArcMirror(float var1, float var2) {
       super(var1, var2);

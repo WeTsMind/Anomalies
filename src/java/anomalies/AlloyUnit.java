@@ -100,6 +100,16 @@ public class AlloyUnit extends UnitType {
       this.proj = Core.atlas.find(this.name + "-projector");
    }
 
+   /** Computes the shield anchor (x, y, rotation) for a unit from its CURRENT state. */
+   static void anchor(Unit var0, float[] var1) {
+      float var2 = var0.rotation;
+      float var3 = Mathf.cosDeg(var2);
+      float var4 = Mathf.sinDeg(var2);
+      var1[0] = var0.x + var3 * -1.5344418F - var3 * recoil(var0);
+      var1[1] = var0.y + var4 * -1.5344418F - var4 * recoil(var0);
+      var1[2] = var2;
+   }
+
    public void update(Unit var1) {
       super.update(var1);
       if (!Vars.net.client()) {
@@ -143,6 +153,10 @@ public class AlloyUnit extends UnitType {
                ((MirrorAnomaly)var21).spawned();
                alloyMirrors.add(var21);
                var9[var19] = (MirrorAnomaly)var21;
+            }
+
+            if (var21 instanceof AlloyArcMirror) {
+               ((AlloyArcMirror)var21).owner = var1;
             }
 
             ((MirrorAnomaly)var21).x = var10[var19][0];

@@ -145,6 +145,10 @@ public class MirrorAnomaly extends Anomaly {
             }
 
          } else {
+            if (Vars.net.client()) {
+               return; // hitscan reflection spawns new bullets - server-authoritative only
+            }
+
             float var4;
             try {
                var4 = rangeOf(var1.type);

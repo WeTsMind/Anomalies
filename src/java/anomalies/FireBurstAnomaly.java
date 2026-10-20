@@ -58,6 +58,28 @@ public class FireBurstAnomaly extends Anomaly {
       this.phase += Time.delta * (0.03F + this.spin * 0.16F);
    }
 
+   // Client-side visual-only tick (no burning): update() is not run on clients, so the spin/active
+   // animation never reacted to units standing in the fire.
+   public void clientUpdate() {
+      float var1 = this.fade();
+      if (this.active > 0.0F) {
+         this.active -= Time.delta;
+      }
+
+      this.scanTimer += Time.delta;
+      if (var1 > 0.9F && this.scanTimer >= 4.0F) {
+         this.scanTimer = 0.0F;
+         Units.nearby(this.x - 8.0F - 4.0F, this.y - 8.0F - 4.0F, 24.0F, 24.0F, this::scan);
+      }
+
+      this.spin = Mathf.lerpDelta(this.spin, this.active > 0.0F ? 1.0F : 0.0F, this.active > 0.0F ? 0.035F : 0.02F);
+      if (this.spin < 0.002F) {
+         this.spin = 0.0F;
+      }
+
+      this.phase += Time.delta * (0.03F + this.spin * 0.16F);
+   }
+
    void scan(Unit var1) {
       if (var1.isValid() && !var1.isFlying()) {
          if (!(Math.abs(var1.x - this.x) > 9.0F) && !(Math.abs(var1.y - this.y) > 9.0F)) {

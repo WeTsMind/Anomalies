@@ -24,6 +24,7 @@ public class AnomalySync {
    static int nextId = 1;
    static final int EXTRA = 100;
    static float updAcc;
+   static float lifeAcc;
    static java.util.HashSet<Integer> beamSent = new java.util.HashSet();
    static final HashMap<Integer, Float> beamStamp = new HashMap();
 
@@ -60,6 +61,17 @@ public class AnomalySync {
                }
             }
 
+            if ((cleanAcc += Time.delta) >= 120.0F) {
+               cleanAcc = 0.0F;
+               arc.struct.IntSet keep = new arc.struct.IntSet();
+               Groups.bullet.each((b) -> {
+                  if (AnomalyManager.reflected.contains(b.id)) {
+                     keep.add(b.id);
+                  }
+               });
+               AnomalyManager.reflected = keep;
+            }
+
             expireBeams();
          } else if (!Vars.net.server()) {
             sent.clear();
@@ -92,11 +104,26 @@ public class AnomalySync {
       }
    }
 
+   static float cleanAcc;
+
    static void clientTick(Anomaly var0, float var1) {
-      if (var0 instanceof TurretBall) {
-         TurretBall var2 = (TurretBall)var0;
-         var2.x += var2.vx * var1;
-         var2.y += var2.vy * var1;
+      if (var0 instanceof MirrorAnomaly && var0.age < var0.life) {
+         // AnomalyManager.update() is skipped on clients, so bullets were never reflected locally
+         // and flew straight through the mirror on every client except the host.
+         var0.update();
+      }
+
+      if (var0 instanceof FireBurstAnomaly && var0.age < var0.life) {
+         ((FireBurstAnomaly)var0).clientUpdate();
+      }
+
+      if (var0 instanceof BallLightningAnomaly) {
+         BallLightningAnomaly var2 = (BallLightningAnomaly)var0;
+         if (var2 instanceof TurretBall) {
+            TurretBall var4 = (TurretBall)var2;
+            var4.x += var4.vx * var1;
+            var4.y += var4.vy * var1;
+         }
 
          for(int var3 = 0; var3 < var2.st.length; ++var3) {
             if (var2.st[var3] > 0.0F) {
@@ -120,23 +147,49 @@ public class AnomalySync {
 
          for(Map.Entry var1 : sent.entrySet()) {
             Anomaly var2 = (Anomaly)var1.getKey();
-            if (mobile(var2) && !var2.dead) {
+            boolean var14 = false;
+            if (var2 instanceof BallLightningAnomaly) {
+               float[] var15 = ((BallLightningAnomaly)var2).st;
+
+               for(int var16 = 0; var16 < var15.length; ++var16) {
+                  if (var15[var16] > 0.0F) {
+                     var14 = true;
+                  }
+               }
+            }
+
+            if ((mobile(var2) || var14) && !var2.dead) {
                StringBuilder var3 = new StringBuilder("u|").append(var1.getValue()).append('|').append(var2.x).append('|').append(var2.y).append('|').append(var2.rotation);
                if (var2 instanceof TurretBall) {
-                  TurretBall var4 = (TurretBall)var2;
-                  var3.append('|').append(var4.vx).append('|').append(var4.vy);
-                  var3.append('|').append(var2.life).append('|').append(var2.age).append('|');
+                  var3.append('|').append(((TurretBall)var2).vx).append('|').append(((TurretBall)var2).vy);
+               } else {
+                  var3.append("|0|0");
+               }
+
+               var3.append('|').append(var2.life).append('|').append(var2.age).append('|');
+               if (var2 instanceof BallLightningAnomaly) {
+                  BallLightningAnomaly var4 = (BallLightningAnomaly)var2;
 
                   for(int var5 = 0; var5 < var4.st.length; ++var5) {
                      if (var4.st[var5] > 0.0F) {
                         var3.append(var5).append(',').append(var4.sx[var5]).append(',').append(var4.sy[var5]).append(',').append(var4.st[var5]).append(',').append(var4.sd[var5]).append(';');
                      }
                   }
-               } else {
-                  var3.append("|0|0|").append(var2.life).append('|').append(var2.age).append('|');
                }
 
                Call.clientPacketUnreliable("anomalies-sync", var3.toString());
+            }
+         }
+
+         if ((lifeAcc += 1.0F) >= 20.0F) {
+            // periodic life/age resync for every anomaly (e.g. black hole adjusts its life after being sent)
+            lifeAcc = 0.0F;
+
+            for(Map.Entry var17 : sent.entrySet()) {
+               Anomaly var18 = (Anomaly)var17.getKey();
+               if (!var18.dead) {
+                  Call.clientPacketUnreliable("anomalies-sync", "l|" + var17.getValue() + "|" + var18.life + "|" + var18.age);
+               }
             }
          }
 
@@ -161,6 +214,37 @@ public class AnomalySync {
          }
 
          beamSent = var6;
+      }
+   }
+
+   // server -> owning client: anomalies moved/pushed this player's unit
+   static void pushUnit(Player var0, float var1, float var2, float var3, float var4, boolean var5, boolean var6) {
+      try {
+         if (var0 == null || var0.con == null) {
+            return;
+         }
+
+         String var7 = "p|" + var1 + "|" + var2 + "|" + var3 + "|" + var4 + "|" + (var5 ? "1" : "0");
+         Call.clientPacketUnreliable(var0.con, "anomalies-sync", var7);
+         if (var6) {
+            Call.clientPacketReliable(var0.con, "anomalies-sync", var7);
+         }
+      } catch (Throwable var8) {
+      }
+
+   }
+
+   // client side: the local unit is client-authoritative, so apply what the server did to it
+   static void applyPush(float var0, float var1, float var2, float var3, boolean var4) {
+      Unit var5 = Vars.player == null ? null : Vars.player.unit();
+      if (var5 != null && var5.isValid()) {
+         if (var4) {
+            var5.set(var0, var1);
+            var5.vel.set(var2, var3);
+         } else {
+            var5.vel.add(var2, var3);
+         }
+
       }
    }
 
@@ -320,23 +404,33 @@ public class AnomalySync {
             var6.life = Float.parseFloat(var1[7]);
             var6.age = Float.parseFloat(var1[8]);
             if (var6 instanceof TurretBall) {
-               TurretBall var7 = (TurretBall)var6;
-               var7.vx = Float.parseFloat(var1[5]);
-               var7.vy = Float.parseFloat(var1[6]);
-               if (var1.length > 9) {
-                  for(String var11 : var1[9].split(";")) {
-                     String[] var12 = var11.split(",");
-                     if (var12.length == 5) {
-                        int var13 = Integer.parseInt(var12[0]);
-                        var7.sx[var13] = Float.parseFloat(var12[1]);
-                        var7.sy[var13] = Float.parseFloat(var12[2]);
-                        var7.st[var13] = Float.parseFloat(var12[3]);
-                        var7.sd[var13] = Integer.parseInt(var12[4]);
-                        var7.act = 1.0F;
-                     }
+               ((TurretBall)var6).vx = Float.parseFloat(var1[5]);
+               ((TurretBall)var6).vy = Float.parseFloat(var1[6]);
+            }
+
+            if (var6 instanceof BallLightningAnomaly && var1.length > 9) {
+               BallLightningAnomaly var7 = (BallLightningAnomaly)var6;
+
+               for(String var11 : var1[9].split(";")) {
+                  String[] var12 = var11.split(",");
+                  if (var12.length == 5) {
+                     int var13 = Integer.parseInt(var12[0]);
+                     var7.sx[var13] = Float.parseFloat(var12[1]);
+                     var7.sy[var13] = Float.parseFloat(var12[2]);
+                     var7.st[var13] = Float.parseFloat(var12[3]);
+                     var7.sd[var13] = Integer.parseInt(var12[4]);
+                     var7.act = 1.0F;
                   }
                }
             }
+         } else if (var1[0].equals("l")) {
+            Anomaly var19 = (Anomaly)remote.get(Integer.parseInt(var1[1]));
+            if (var19 != null) {
+               var19.life = Float.parseFloat(var1[2]);
+               var19.age = Float.parseFloat(var1[3]);
+            }
+         } else if (var1[0].equals("p")) {
+            applyPush(Float.parseFloat(var1[1]), Float.parseFloat(var1[2]), Float.parseFloat(var1[3]), Float.parseFloat(var1[4]), var1[5].equals("1"));
          } else if (var1[0].equals("b")) {
             Unit var14 = (Unit)Groups.unit.getByID(Integer.parseInt(var1[1]));
             if (var14 != null) {

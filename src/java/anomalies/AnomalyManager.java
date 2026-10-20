@@ -18,6 +18,7 @@ import mindustry.gen.Bullet;
 import mindustry.gen.Entityc;
 import mindustry.gen.Groups;
 import mindustry.gen.Healthc;
+import mindustry.gen.Player;
 import mindustry.gen.Posc;
 import mindustry.gen.Unit;
 import mindustry.graphics.Pal;
@@ -35,6 +36,9 @@ public class AnomalyManager {
    static final IntMap<Track> tracks = new IntMap();
    static final IntSeq removeIds = new IntSeq();
    public static final Seq<Unit> tmp = new Seq();
+   static final Seq<Player> pPlayers = new Seq();
+   static final Seq<Unit> pUnits = new Seq();
+   static float[] pBefore = new float[16];
    static float spawnTimer;
    static float nextSpawn;
    static float sampleTimer;
@@ -100,6 +104,8 @@ public class AnomalyManager {
             reflected = var1;
          }
 
+         snapshotPlayers();
+
          for(int var3 = list.size - 1; var3 >= 0; --var3) {
             Anomaly var2 = (Anomaly)list.get(var3);
             var2.age += var0;
@@ -111,7 +117,69 @@ public class AnomalyManager {
             }
          }
 
+         pushPlayers();
+
       }
+   }
+
+   // The position/velocity of a remote player's unit is client-authoritative: the server's own changes
+   // (push, teleport, pull, rollback) get overwritten by the next client snapshot, so anomalies appeared
+   // to do nothing to clients. Remember the state before the anomalies run...
+   static void snapshotPlayers() {
+      pPlayers.clear();
+      pUnits.clear();
+      if (!Vars.net.server()) {
+         return;
+      }
+
+      try {
+         for(int var4 = 0; var4 < Groups.player.size(); ++var4) {
+            Player var0 = (Player)Groups.player.index(var4);
+            Unit var1 = var0.unit();
+            if (var0.con != null && !var0.isLocal() && var1 != null && var1.isValid()) {
+               int var2 = pPlayers.size * 4;
+               if (var2 + 4 > pBefore.length) {
+                  pBefore = java.util.Arrays.copyOf(pBefore, pBefore.length * 2);
+               }
+
+               pBefore[var2] = var1.x;
+               pBefore[var2 + 1] = var1.y;
+               pBefore[var2 + 2] = var1.vel.x;
+               pBefore[var2 + 3] = var1.vel.y;
+               pPlayers.add(var0);
+               pUnits.add(var1);
+            }
+         }
+      } catch (Throwable var3) {
+      }
+
+   }
+
+   // ...and afterwards tell the owning client about whatever the anomalies changed.
+   static void pushPlayers() {
+      try {
+         for(int var0 = 0; var0 < pPlayers.size; ++var0) {
+            Player var1 = (Player)pPlayers.get(var0);
+            Unit var2 = (Unit)pUnits.get(var0);
+            if (var2.isValid() && var1.unit() == var2) {
+               int var3 = var0 * 4;
+               float var4 = var2.x - pBefore[var3];
+               float var5 = var2.y - pBefore[var3 + 1];
+               float var6 = var2.vel.x - pBefore[var3 + 2];
+               float var7 = var2.vel.y - pBefore[var3 + 3];
+               float var8 = Math.abs(var4) + Math.abs(var5);
+               if (var8 > 0.01F) {
+                  AnomalySync.pushUnit(var1, var2.x, var2.y, var2.vel.x, var2.vel.y, true, var8 > 24.0F);
+               } else if (Math.abs(var6) + Math.abs(var7) > 0.01F) {
+                  AnomalySync.pushUnit(var1, 0.0F, 0.0F, var6, var7, false, false);
+               }
+            }
+         }
+      } catch (Throwable var9) {
+      }
+
+      pPlayers.clear();
+      pUnits.clear();
    }
 
    static void draw() {
