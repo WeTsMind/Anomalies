@@ -31,6 +31,7 @@ public class WallBreaker extends Block {
       this.update = true;
       this.hasPower = true;
       this.destructible = true;
+      this.alwaysUnlocked = true;
       this.health = 400;
       this.requirements(Category.effect, BuildVisibility.shown, ItemStack.with(new Object[]{Items.plastanium, 50, Items.surgeAlloy, 5, Items.silicon, 20}));
       this.consumePower(2.0F);

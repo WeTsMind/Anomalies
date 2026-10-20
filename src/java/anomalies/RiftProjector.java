@@ -88,7 +88,8 @@ public class RiftProjector extends Block {
       }
 
       public void draw() {
-         super.draw();
+         // Sprite is drawn with its slit facing up; turn it so the slit points where the beams go.
+         Draw.rect(this.block.region, this.x, this.y, this.rotdeg() - 90.0F);
          float var1 = this.charge / 600.0F;
          if (!(var1 <= 0.001F)) {
             float var2 = Time.time;
