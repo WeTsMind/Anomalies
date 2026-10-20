@@ -8,6 +8,7 @@ import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import mindustry.Vars;
+import mindustry.content.Blocks;
 import mindustry.entities.Effect;
 import mindustry.game.EventType.Trigger;
 import mindustry.world.Tile;
@@ -66,7 +67,7 @@ final class PolcimGlow {
          float var0 = 0.015F;
 
          for(int var1 = 0; var1 < count; ++var1) {
-            if (Math.random() < (double)var0) {
+            if (Math.random() < (double)var0 && Vars.world.tile(xs[var1], ys[var1]).block() == Blocks.air) {
                mote.at(((float)xs[var1] + (float)Math.random() - 0.5F) * 8.0F, ((float)ys[var1] + (float)Math.random() - 0.5F) * 8.0F, 0.0F);
             }
          }
@@ -88,7 +89,7 @@ final class PolcimGlow {
       for(int var8 = var3; var8 <= var4 && var7 < 600; ++var8) {
          for(int var9 = var5; var9 <= var6 && var7 < 600; ++var9) {
             Tile var10 = Vars.world.tile(var8, var9);
-            if (var10 != null && var10.overlay() == AnomalyMod.polcimOre) {
+            if (var10 != null && var10.overlay() == AnomalyMod.polcimOre && var10.block() == Blocks.air) {
                xs[var7] = var8;
                ys[var7] = var9;
                ++var7;
