@@ -36,6 +36,8 @@ public class AnomalyProtector extends Block {
    static float cacheStamp = -1.0F;
 
    public TextureRegion starRegion;
+   public TextureRegion radarRegion;
+   public TextureRegion radarGlowRegion;
 
    public AnomalyProtector(String var1) {
       super(var1);
@@ -55,6 +57,8 @@ public class AnomalyProtector extends Block {
    public void load() {
       super.load();
       this.starRegion = Core.atlas.find(this.name + "-star");
+      this.radarRegion = Core.atlas.find(this.name + "-radar");
+      this.radarGlowRegion = Core.atlas.find(this.name + "-radar-glow");
    }
 
    public void drawPlace(int var1, int var2, int var3, boolean var4) {
@@ -130,6 +134,7 @@ public class AnomalyProtector extends Block {
 
       public void draw() {
          Draw.rect(this.block.region, this.x, this.y);
+         Draw.rect(AnomalyProtector.this.radarRegion, this.x, this.y, Time.time);
          if (this.heat < 0.01F) {
             return;
          }
@@ -140,6 +145,7 @@ public class AnomalyProtector extends Block {
          Draw.blend(Blending.additive);
          Draw.color(AnomalyProtector.glow, this.heat * pulse);
          Draw.rect(AnomalyProtector.this.starRegion, this.x, this.y);
+         Draw.rect(AnomalyProtector.this.radarGlowRegion, this.x, this.y, Time.time);
 
          // Large Mender-style pulse: a square ring that expands from the block outwards.
          int rings = this.boosted() ? 2 : 1;

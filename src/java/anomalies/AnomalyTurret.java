@@ -115,11 +115,16 @@ public class AnomalyTurret extends PowerTurret {
          float var4 = this.y - AnomalyTurret.ty(this.rotation, 2.5F + var2);
          float var5 = 0.5F + 0.5F * (float)Math.sin((double)(Time.time / 18.0F));
          float var6 = Math.min(1.0F, 0.35F + 0.4F * Math.min(1.0F, this.efficiency) + 0.1F * var5 + 0.4F * this.heat);
+         // the core glows only while the turret is supplied with power
+         float powered = this.power == null ? 0.0F : Mathf.clamp(this.power.status);
+         var6 *= powered;
          Draw.z(51.0F);
          Draw.blend(Blending.additive);
-         Draw.alpha(var6);
-         float var7 = 28.0F * (1.0F + 0.06F * this.heat);
-         Draw.rect(AnomalyTurret.this.glowRegion, var3, var4, var7, var7, Time.time * 0.5F);
+         if (powered > 0.01F) {
+            Draw.alpha(var6);
+            float var7 = 28.0F * (1.0F + 0.06F * this.heat);
+            Draw.rect(AnomalyTurret.this.glowRegion, var3, var4, var7, var7, Time.time * 0.5F);
+         }
          float var8 = TurretPatch.begin(this, var1);
          if (var8 > 0.0F) {
             int var9 = (int)(Time.time / 3.0F);

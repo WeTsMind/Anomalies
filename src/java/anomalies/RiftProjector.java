@@ -1,10 +1,13 @@
 package anomalies;
 
+import arc.Core;
 import arc.graphics.Blending;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
+import arc.math.Mathf;
+import arc.graphics.g2d.TextureRegion;
 import arc.util.Eachable;
 import arc.util.Time;
 import arc.util.io.Reads;
@@ -20,6 +23,9 @@ import mindustry.world.meta.BuildVisibility;
 
 public class RiftProjector extends Block {
    static final Color col = Color.valueOf("58FFF9");
+   public TextureRegion glowRegion;
+   public TextureRegion arrowRegion;
+   public TextureRegion arrowGlowRegion;
    static final float chargeTime = 600.0F;
    static final float reach = 30.0F;
 
@@ -37,10 +43,18 @@ public class RiftProjector extends Block {
       this.buildType = () -> new RiftBuild();
    }
 
+   public void load() {
+      super.load();
+      this.glowRegion = Core.atlas.find(this.name + "-glow");
+      this.arrowRegion = Core.atlas.find(this.name + "-arrow");
+      this.arrowGlowRegion = Core.atlas.find(this.name + "-arrow-glow");
+   }
+
    // The sprite faces up, so the placement preview needs the same -90 offset as draw() below.
    @Override
    public void drawPlanRegion(BuildPlan plan, Eachable<BuildPlan> list) {
-      Draw.rect(this.region, plan.drawx(), plan.drawy(), (float)plan.rotation * 90.0F - 90.0F);
+      Draw.rect(this.region, plan.drawx(), plan.drawy());
+      Draw.rect(this.arrowRegion, plan.drawx(), plan.drawy(), (float)plan.rotation * 90.0F - 90.0F);
    }
 
    public class RiftBuild extends Building {
@@ -97,13 +111,22 @@ public class RiftProjector extends Block {
 
       public void draw() {
          // Sprite is drawn with its slit facing up; turn it so the slit points where the beams go.
-         Draw.rect(this.block.region, this.x, this.y, this.rotdeg() - 90.0F);
+         Draw.rect(this.block.region, this.x, this.y);
+         Draw.rect(RiftProjector.this.arrowRegion, this.x, this.y, this.rotdeg() - 90.0F);
          float var1 = this.charge / 600.0F;
          if (!(var1 <= 0.001F)) {
             float var2 = Time.time;
             float var3 = 0.75F + 0.25F * (float)Math.sin((double)(var2 * 0.5F));
             Draw.z(Layer.effect);
             Draw.blend(Blending.additive);
+
+            // glow over the bright parts of the sprite, same idea as the protector's star
+            float powered = this.power == null ? 0.0F : Mathf.clamp(this.power.status);
+            if (powered > 0.01F) {
+               Draw.color(RiftProjector.col, var1 * var3 * powered);
+               Draw.rect(RiftProjector.this.glowRegion, this.x, this.y);
+               Draw.rect(RiftProjector.this.arrowGlowRegion, this.x, this.y, this.rotdeg() - 90.0F);
+            }
 
             for(int var4 = 0; var4 < 2; ++var4) {
                float var5 = this.x + (this.px(var4) - this.x) * var1;
