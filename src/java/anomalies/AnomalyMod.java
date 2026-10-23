@@ -25,6 +25,8 @@ public class AnomalyMod extends Mod {
    public static UnitType hunter;
    public static Item polcim;
    public static Block polcimOre;
+   public static Item tratat;
+   public static Block tratatOre;
 
    public void loadContent() {
       tzinch = new TzinchBlock("tzinch-block");
@@ -51,6 +53,13 @@ public class AnomalyMod extends Mod {
       };
       polcimOre = new OreBlock("polcim-ore", polcim);
       ((Floor)polcimOre).variants = 1;
+      tratat = new Item("tratat", Color.valueOf("5ee58b")) {
+         {
+            this.hardness = 4;
+         }
+      };
+      tratatOre = new OreBlock("tratat-ore", tratat);
+      ((Floor)tratatOre).variants = 2;
    }
 
    public void init() {

@@ -5,10 +5,12 @@ import mindustry.Vars;
 import mindustry.ctype.ContentType;
 import mindustry.ctype.MappableContent;
 import mindustry.type.UnitType;
+import mindustry.world.Block;
 
 public class AnomalyModFixed extends AnomalyModGolden {
    public static UnitType seraph;
    public static SeraphCore seraphCore;
+   public static Block laserBlock;
 
    public void loadContent() {
       super.loadContent();
@@ -19,6 +21,12 @@ public class AnomalyModFixed extends AnomalyModGolden {
          seraphCore.unitType = seraph;
       } catch (Throwable var1) {
          Log.err(var1);
+      }
+
+      try {
+         laserBlock = new LaserBlock("laser-block");
+      } catch (Throwable var2) {
+         Log.err(var2);
       }
 
    }

@@ -35,7 +35,7 @@ public class AnomalyModGolden extends AnomalyModTurret {
 
       try {
          if (polcimOre instanceof Floor) {
-            ((Floor)polcimOre).variants = 3;
+            ((Floor)polcimOre).variants = 2;
          }
       } catch (Throwable var2) {
          report(var2);

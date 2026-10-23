@@ -10,11 +10,10 @@ import mindustry.gen.Unit;
 public class SeraphAnim {
    static final float NONE = -1.0E9F;
    static final float OPEN_END = 36.0F;
-   static final float SHOW = 24.0F;
-   static final float WING_START = 40.0F;
-   static final float WING_END = 84.0F;
-   static final float CLOSE_START = 84.0F;
-   static final float CLOSE_END = 120.0F;
+   static final float WING_START = 46.0F;
+   static final float WING_END = 90.0F;
+   static final float CLOSE_START = 90.0F;
+   static final float CLOSE_END = 126.0F;
    static final Map<Unit, Float> starts = new WeakHashMap();
 
    static float smooth(float var0) {
@@ -43,6 +42,11 @@ public class SeraphAnim {
       }
 
       return Time.time - var1;
+   }
+
+   /** Wings fade in (folded) right after the lids are open. */
+   static float wingAlpha(float var0) {
+      return smooth((var0 - OPEN_END) / 10.0F);
    }
 
    /** 0 = wings folded back, 1 = fully spread. */
