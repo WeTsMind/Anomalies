@@ -7,6 +7,22 @@ import mindustry.ctype.MappableContent;
 import mindustry.type.UnitType;
 
 public class AnomalyModFixed extends AnomalyModGolden {
+   public static UnitType seraph;
+   public static SeraphCore seraphCore;
+
+   public void loadContent() {
+      super.loadContent();
+
+      try {
+         seraph = new SeraphUnit("seraph");
+         seraphCore = new SeraphCore("seraph-core");
+         seraphCore.unitType = seraph;
+      } catch (Throwable var1) {
+         Log.err(var1);
+      }
+
+   }
+
    public void init() {
       super.init();
       fix("anomalies-alloy");

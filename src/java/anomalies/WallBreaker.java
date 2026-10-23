@@ -76,6 +76,7 @@ public class WallBreaker extends Block {
       final float[] progress = new float[2];
       /** 0..1 growth of each laser: 0 = lane 0, 1 = centre, 2 = lane 1. */
       final float[] beam = new float[3];
+      float glowFade;
       final Tile[] targets = new Tile[2];
 
       int laneX(int lane) {
@@ -171,8 +172,9 @@ public class WallBreaker extends Block {
       /** Pulsing green glow over the bright parts of the sprite, only while the block is powered and cutting. */
       void drawGlow() {
          float on = this.power == null ? 0.0F : Mathf.clamp(this.power.status);
-         float a = this.maxBeam() * on;
-         if (a <= 0.001F) return;
+         this.glowFade = Mathf.lerpDelta(this.glowFade, this.maxBeam() * on, 0.04F);
+         float a = this.glowFade * this.glowFade * (3.0F - 2.0F * this.glowFade);
+         if (this.glowFade <= 0.001F) return;
          float pulse = 0.75F + 0.25F * (float)Math.sin((double)(Time.time / 18.0F));
          Draw.z(Layer.effect);
          Draw.blend(Blending.additive);

@@ -7,7 +7,7 @@ public class AlloyBall extends TurretBall {
 
    public void update() {
       float var1 = AlloyDmg.mul;
-      AlloyDmg.mul = 2.0F;
+      AlloyDmg.mul = 2.5F;
 
       try {
          super.update();

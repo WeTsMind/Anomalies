@@ -59,6 +59,7 @@ public class RiftProjector extends Block {
 
    public class RiftBuild extends Building {
       float charge;
+      float glowFade;
       MirrorAnomaly proj;
 
       float pa(int var1) {
@@ -122,8 +123,10 @@ public class RiftProjector extends Block {
 
             // glow over the bright parts of the sprite, same idea as the protector's star
             float powered = this.power == null ? 0.0F : Mathf.clamp(this.power.status);
-            if (powered > 0.01F) {
-               Draw.color(RiftProjector.col, var1 * var3 * powered);
+            this.glowFade = Mathf.lerpDelta(this.glowFade, powered, 0.03F);
+            float fade = this.glowFade * this.glowFade * (3.0F - 2.0F * this.glowFade);
+            if (this.glowFade > 0.01F) {
+               Draw.color(RiftProjector.col, var1 * var3 * fade);
                Draw.rect(RiftProjector.this.glowRegion, this.x, this.y);
                Draw.rect(RiftProjector.this.arrowGlowRegion, this.x, this.y, this.rotdeg() - 90.0F);
             }

@@ -23,8 +23,8 @@ public class AnomalyTurret extends PowerTurret {
    static final Color cCore = Color.valueOf("fff8d0");
    static final float glowBack = 2.5F;
    static final float FLASH = 26.0F;
-   static final float[] BUMP_F = new float[]{-7.125F, -7.125F, -4.125F, -4.125F};
-   static final float[] BUMP_R = new float[]{-5.375F, 5.375F, -5.125F, 5.125F};
+   static final float[] BUMP_F = new float[]{-9.0F, -9.0F, -9.25F, -7.5F, -7.5F, -4.25F, -4.25F};
+   static final float[] BUMP_R = new float[]{-4.0F, 4.0F, 0.0F, -5.375F, 5.375F, -5.125F, 5.125F};
    static final BallLightningAnomaly fx = new BallLightningAnomaly();
    TextureRegion glowRegion;
 
@@ -96,6 +96,7 @@ public class AnomalyTurret extends PowerTurret {
 
    public class AnomalyBuild extends PowerTurret.PowerTurretBuild {
       float lastHeat;
+      float glowFade;
       float shotTime = -100000.0F;
 
       public AnomalyBuild() {
@@ -116,7 +117,8 @@ public class AnomalyTurret extends PowerTurret {
          float var5 = 0.5F + 0.5F * (float)Math.sin((double)(Time.time / 18.0F));
          float var6 = Math.min(1.0F, 0.35F + 0.4F * Math.min(1.0F, this.efficiency) + 0.1F * var5 + 0.4F * this.heat);
          // the core glows only while the turret is supplied with power
-         float powered = this.power == null ? 0.0F : Mathf.clamp(this.power.status);
+         this.glowFade = Mathf.lerpDelta(this.glowFade, this.power == null ? 0.0F : Mathf.clamp(this.power.status), 0.03F);
+         float powered = this.glowFade * this.glowFade * (3.0F - 2.0F * this.glowFade);
          var6 *= powered;
          Draw.z(51.0F);
          Draw.blend(Blending.additive);

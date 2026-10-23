@@ -97,6 +97,7 @@ public class AnomalyProtector extends Block {
    public class ProtectorBuild extends Building {
       float boostLeft;
       float heat;
+      float radarRot;
       float shown = RADIUS;
 
       boolean active() {
@@ -117,7 +118,11 @@ public class AnomalyProtector extends Block {
 
       public void updateTile() {
          boolean on = this.active();
-         this.heat = Mathf.lerpDelta(this.heat, on ? 1.0F : 0.0F, 0.08F);
+         this.heat = Mathf.lerpDelta(this.heat, on ? 1.0F : 0.0F, 0.03F);
+         if (this.power != null && this.power.status >= 0.999F) {
+            this.radarRot += Time.delta;
+         }
+
          if (on) {
             if (this.boostLeft > 0.0F) {
                this.boostLeft -= Time.delta;
@@ -134,18 +139,26 @@ public class AnomalyProtector extends Block {
 
       public void draw() {
          Draw.rect(this.block.region, this.x, this.y);
-         Draw.rect(AnomalyProtector.this.radarRegion, this.x, this.y, Time.time);
+         float pulse = 0.75F + 0.25F * (float)Math.sin((double)(Time.time / 18.0F));
+         float half = (float)AnomalyProtector.this.size * 4.0F;
+         float fade = this.heat * this.heat * (3.0F - 2.0F * this.heat);
+         if (this.heat >= 0.01F) {
+            Draw.blend(Blending.additive);
+            Draw.color(AnomalyProtector.glow, fade * pulse);
+            Draw.rect(AnomalyProtector.this.starRegion, this.x, this.y);
+            Draw.blend();
+            Draw.reset();
+         }
+
+         Draw.rect(AnomalyProtector.this.radarRegion, this.x, this.y, this.radarRot);
          if (this.heat < 0.01F) {
             return;
          }
 
-         float pulse = 0.75F + 0.25F * (float)Math.sin((double)(Time.time / 18.0F));
-         float half = (float)AnomalyProtector.this.size * 4.0F;
-         Draw.z(Layer.effect);
          Draw.blend(Blending.additive);
-         Draw.color(AnomalyProtector.glow, this.heat * pulse);
-         Draw.rect(AnomalyProtector.this.starRegion, this.x, this.y);
-         Draw.rect(AnomalyProtector.this.radarGlowRegion, this.x, this.y, Time.time);
+         Draw.color(AnomalyProtector.glow, fade * pulse);
+         Draw.rect(AnomalyProtector.this.radarGlowRegion, this.x, this.y, this.radarRot);
+         Draw.z(Layer.effect);
 
          // Large Mender-style pulse: a square ring that expands from the block outwards.
          int rings = this.boosted() ? 2 : 1;
