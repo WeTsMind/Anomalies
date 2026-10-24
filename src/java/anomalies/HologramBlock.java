@@ -565,7 +565,7 @@ public class HologramBlock extends Block {
             c.button(Core.bundle.get("hologram.undo", "Undo"), this::undo);
             c.button(Core.bundle.get("hologram.redo", "Redo"), this::redo).row();
             c.button(Core.bundle.get("hologram.eraser", "Eraser"), Styles.togglet, () -> this.eraser = !this.eraser).checked(t -> this.eraser);
-            c.button(Core.bundle.get("hologram.import", "Import PNG"), this::chooseFile).row();
+            c.row();
             c.button(Core.bundle.get("hologram.copy", "Copy"), this::copy);
             c.button(Core.bundle.get("hologram.paste", "Paste"), this::paste).row();
             this.fw = new TextField(String.valueOf(this.img.w));
@@ -628,7 +628,7 @@ public class HologramBlock extends Block {
       }
 
       void commit() {
-         if (this.valid.get()) this.sink.get(pack(this.img));
+         if (this.valid.get()) this.sink.get(HologramBlock.pack(this.img));
       }
 
       void undo() {
@@ -707,28 +707,6 @@ public class HologramBlock extends Block {
          this.img = n;
          this.rebuildGfx();
          this.commit();
-      }
-
-      void chooseFile() {
-         Vars.platform.showFileChooser(true, "png", f -> Core.app.post(() -> this.importFile(f)));
-      }
-
-      void importFile(Fi f) {
-         try {
-            Pixmap src = new Pixmap(f);
-            int w = src.getWidth(), h = src.getHeight();
-            int[] argb = new int[w * h];
-            for(int y = 0; y < h; ++y) {
-               for(int x = 0; x < w; ++x) {
-                  int c = src.get(x, y); // rgba8888 -> argb
-                  argb[y * w + x] = (c << 24) | (c >>> 8);
-               }
-            }
-            src.dispose();
-            this.applyImage(argb, w, h);
-         } catch (Throwable t) {
-            Vars.ui.showException(t);
-         }
       }
 
       void set(int x, int y, boolean on) {

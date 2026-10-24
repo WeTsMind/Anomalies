@@ -111,7 +111,7 @@ public class DecryptorBlock extends Block {
          }
       }
 
-      String status() {
+      String statusText() {
          if (this.img == null) return Core.bundle.get("decryptor.empty", "Empty. Paste a picture.");
          Secrets.Secret s = this.secret();
          if (s == null) return Core.bundle.get("decryptor.unknown", "Cannot decrypt this picture.");
@@ -147,7 +147,7 @@ public class DecryptorBlock extends Block {
       public void buildConfiguration(Table table) {
          table.table(Styles.black6, t -> {
             t.defaults().pad(3.0F);
-            t.label(() -> this.status()).width(230.0F).wrap().row();
+            t.label(() -> this.statusText()).width(230.0F).wrap().row();
             t.button(Core.bundle.get("decryptor.paste", "Paste"), () -> {
                HologramBlock.Img im = HologramBlock.pasteSource();
                if (im == null || HologramBlock.tight(im) == null) {
