@@ -15,6 +15,8 @@ public class SeraphAnim {
    static final float CLOSE_START = 90.0F;
    static final float CLOSE_END = 126.0F;
    static final Map<Unit, Float> starts = new WeakHashMap();
+   /** Units that already left the core (they get their launch push once). */
+   static final java.util.Set<Unit> released = java.util.Collections.newSetFromMap(new WeakHashMap());
 
    static float smooth(float var0) {
       var0 = Mathf.clamp(var0);
@@ -44,9 +46,9 @@ public class SeraphAnim {
       return Time.time - var1;
    }
 
-   /** Wings fade in (folded) right after the lids are open. */
+   /** The wings are already there (folded) when the unit leaves the core, so no fade. */
    static float wingAlpha(float var0) {
-      return smooth((var0 - OPEN_END) / 10.0F);
+      return 1.0F;
    }
 
    /** 0 = wings folded back, 1 = fully spread. */
