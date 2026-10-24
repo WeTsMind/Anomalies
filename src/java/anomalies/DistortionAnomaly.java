@@ -10,6 +10,7 @@ import arc.struct.Seq;
 import arc.util.Time;
 import arc.util.Tmp;
 import java.util.Objects;
+import mindustry.Vars;
 import mindustry.entities.Units;
 import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
@@ -27,6 +28,42 @@ public class DistortionAnomaly extends Anomaly {
       return violet;
    }
 
+   /**
+    * A remote player's unit is client-authoritative: whatever the server does to its velocity is overwritten by the
+    * client's next snapshot and only arrives back as a delayed push, so the player could walk into the field and
+    * then get thrown out a moment later. So the owning client pushes its own unit (no delay) and the server skips it.
+    */
+   boolean ownedByRemotePlayer(Unit var1) {
+      try {
+         return Vars.net.server() && var1.isPlayer() && var1.getPlayer() != null && !var1.getPlayer().isLocal();
+      } catch (Throwable var2) {
+         return false;
+      }
+   }
+
+   void push(Unit var2) {
+      float var3 = 16.0F + var2.hitSize / 2.0F;
+      float var4 = var2.dst(this.x, this.y);
+      if (!(var4 > var3) && var2.isValid()) {
+         float var5 = 0.9F + (1.0F - var4 / var3) * 1.6F;
+         Tmp.v1.set(var2.x - this.x, var2.y - this.y);
+         if (Tmp.v1.isZero()) {
+            Tmp.v1.set(1.0F, 0.0F).rotate(Mathf.random(360.0F));
+         }
+
+         Tmp.v1.nor().scl(var5 * Time.delta);
+         var2.vel.add(Tmp.v1);
+      }
+   }
+
+   /** Client: push only the local player's own unit, every frame, exactly like the server would. */
+   public void clientUpdate() {
+      Unit var1 = Vars.player == null ? null : Vars.player.unit();
+      if (var1 != null && var1.isValid()) {
+         this.push(var1);
+      }
+   }
+
    public void update() {
       AnomalyManager.tmp.clear();
       float var10000 = this.x - 16.0F - 16.0F;
@@ -36,17 +73,8 @@ public class DistortionAnomaly extends Anomaly {
       Units.nearby(var10000, var10001, 64.0F, 64.0F, var10004::add);
 
       for(Unit var2 : AnomalyManager.tmp) {
-         float var3 = 16.0F + var2.hitSize / 2.0F;
-         float var4 = var2.dst(this.x, this.y);
-         if (!(var4 > var3) && var2.isValid()) {
-            float var5 = 0.9F + (1.0F - var4 / var3) * 1.6F;
-            Tmp.v1.set(var2.x - this.x, var2.y - this.y);
-            if (Tmp.v1.isZero()) {
-               Tmp.v1.set(1.0F, 0.0F).rotate(Mathf.random(360.0F));
-            }
-
-            Tmp.v1.nor().scl(var5 * Time.delta);
-            var2.vel.add(Tmp.v1);
+         if (!this.ownedByRemotePlayer(var2)) {
+            this.push(var2);
          }
       }
 

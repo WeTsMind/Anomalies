@@ -17,6 +17,9 @@ public class SeraphCore extends CoreBlock {
    TextureRegion seraphBase;
    TextureRegion seraphLidL;
    TextureRegion seraphLidR;
+   /** the light lines of the lids, drawn in the team colour */
+   TextureRegion seraphTeamL;
+   TextureRegion seraphTeamR;
 
    public SeraphCore(String var1) {
       super(var1);
@@ -34,6 +37,8 @@ public class SeraphCore extends CoreBlock {
       this.seraphBase = Core.atlas.find(this.name + "-base");
       this.seraphLidL = Core.atlas.find(this.name + "-lid-left");
       this.seraphLidR = Core.atlas.find(this.name + "-lid-right");
+      this.seraphTeamL = Core.atlas.find(this.name + "-lid-left-team");
+      this.seraphTeamR = Core.atlas.find(this.name + "-lid-right-team");
    }
 
    public boolean canPlaceOn(Tile var1, Team var2, int var3) {
@@ -54,7 +59,13 @@ public class SeraphCore extends CoreBlock {
          float var1 = SeraphAnim.lids(Time.time - this.openStart) * 7.5F;
          Draw.rect(SeraphCore.this.seraphBase, this.x, this.y);
          Draw.rect(SeraphCore.this.seraphLidL, this.x - 3.5F - var1, this.y);
+         Draw.color(this.team.color);
+         Draw.rect(SeraphCore.this.seraphTeamL, this.x - 3.5F - var1, this.y);
+         Draw.reset();
          Draw.rect(SeraphCore.this.seraphLidR, this.x + 3.0F + var1, this.y);
+         Draw.color(this.team.color);
+         Draw.rect(SeraphCore.this.seraphTeamR, this.x + 3.0F + var1, this.y);
+         Draw.reset();
       }
    }
 }

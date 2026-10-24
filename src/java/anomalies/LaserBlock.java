@@ -34,7 +34,7 @@ import mindustry.world.Block;
 import mindustry.world.meta.BuildVisibility;
 
 /**
- * Laser Block. A glowing purple four-pointed star sits on the block. Two Laser Blocks of the same team
+ * Laser Block (up to {@link #maxLinks} lasers per block). A glowing purple four-pointed star sits on the block. Two Laser Blocks of the same team
  * closer than {@link #range} tiles can be linked (select one, tap the other) and a purple laser appears between
  * them that shocks every enemy unit and building under it.
  *
@@ -49,6 +49,8 @@ import mindustry.world.meta.BuildVisibility;
 public class LaserBlock extends Block {
    /** Maximum distance between two linked blocks, in tiles. */
    public static final float range = 17.0F;
+   /** How many blocks one Laser Block can shoot at. */
+   public static final int maxLinks = 3;
    /** Ticks between two damage pulses. */
    static final float hitInterval = 6.0F;
    /** Damage per pulse to units (10 per 6 ticks = 100/s). */
@@ -58,8 +60,8 @@ public class LaserBlock extends Block {
    /** Half thickness of the beam used for hit detection, world units. */
    static final float beamHit = 3.0F;
 
-   static final Color col = Color.valueOf("d38bef");
-   static final Color hot = Color.valueOf("f3dcff");
+   public static final Color col = Color.valueOf("d38bef");
+   public static final Color hot = Color.valueOf("f3dcff");
 
    /** Purple sparks where the laser touches a unit or a building. Spawned locally by every client. */
    static final Effect hitFx = new Effect(20.0F, (e) -> {
@@ -90,8 +92,13 @@ public class LaserBlock extends Block {
       this.requirements(Category.effect, BuildVisibility.shown, ItemStack.with(new Object[]{Items.silicon, 30, Items.titanium, 15, Items.lead, 20}));
 
       // The same two config types the game's own bridges use: Point2 is relative (schematics), Integer is an absolute tile position.
-      this.config(Point2.class, (LaserBuild b, Point2 p) -> b.link = Point2.pack(p.x + b.tileX(), p.y + b.tileY()));
-      this.config(Integer.class, (LaserBuild b, Integer i) -> b.link = i);
+      // Integer: toggles a link to that tile position (-1 clears all links). Point2: relative link (schematics). Point2[]: whole link list.
+      this.config(Integer.class, (LaserBuild b, Integer i) -> b.toggleLink(i));
+      this.config(Point2.class, (LaserBuild b, Point2 p) -> b.addLink(Point2.pack(p.x + b.tileX(), p.y + b.tileY())));
+      this.config(Point2[].class, (LaserBuild b, Point2[] ps) -> {
+         b.clearLinks();
+         for (Point2 p : ps) b.addLink(Point2.pack(p.x + b.tileX(), p.y + b.tileY()));
+      });
       this.buildType = () -> new LaserBuild();
    }
 
@@ -117,57 +124,105 @@ public class LaserBlock extends Block {
    }
 
    public class LaserBuild extends Building {
-      /** Tile position of the block this one shoots at, or -1. */
-      public int link = -1;
+      /** Tile positions of the blocks this one shoots at (-1 = free slot). */
+      public final int[] links = {-1, -1, -1};
       /** 0..1 growth of the star after the block is placed. */
       float starScale;
-      /** 0..1 growth of the laser. */
-      float beamProg;
+      /** 0..1 growth of each laser. */
+      final float[] beamProg = new float[maxLinks];
       float hitTimer;
-      /** Last known end of the laser, so it can shrink back after the link is lost. */
-      float tx;
-      float ty;
+      /** Last known end of each laser, so it can shrink back after the link is lost. */
+      final float[] tx = new float[maxLinks];
+      final float[] ty = new float[maxLinks];
 
-      /** The valid block at the other end of the laser, or null. */
-      LaserBuild target() {
-         if (this.link == -1 || !this.enabled) return null;
-         Building b = Vars.world.build(this.link);
+      boolean hasLink(int pos) {
+         for (int i = 0; i < maxLinks; ++i) if (this.links[i] == pos) return true;
+         return false;
+      }
+
+      void clearLinks() {
+         for (int i = 0; i < maxLinks; ++i) this.links[i] = -1;
+      }
+
+      /** Adds a link into the first free slot; does nothing if it exists already or all slots are used. */
+      void addLink(int pos) {
+         if (pos == -1 || this.hasLink(pos)) return;
+         for (int i = 0; i < maxLinks; ++i) {
+            if (this.links[i] == -1) {
+               this.links[i] = pos;
+               return;
+            }
+         }
+      }
+
+      /** Same code runs on the server and on every client, so the result is identical everywhere. */
+      void toggleLink(int pos) {
+         if (pos == -1) {
+            this.clearLinks();
+         } else if (this.hasLink(pos)) {
+            for (int i = 0; i < maxLinks; ++i) if (this.links[i] == pos) this.links[i] = -1;
+         } else {
+            this.addLink(pos);
+         }
+      }
+
+      int linkCount() {
+         int n = 0;
+         for (int i = 0; i < maxLinks; ++i) if (this.links[i] != -1) ++n;
+         return n;
+      }
+
+      /** The valid block at the other end of laser slot i, or null. */
+      LaserBuild target(int i) {
+         if (this.links[i] == -1 || !this.enabled) return null;
+         Building b = Vars.world.build(this.links[i]);
          if (!(b instanceof LaserBuild) || b == this || b.team != this.team) return null;
          if (Mathf.dst(this.x, this.y, b.x, b.y) > range * 8.0F + 0.5F) return null;
          return (LaserBuild)b;
       }
 
+      float maxBeam() {
+         float m = 0.0F;
+         for (int i = 0; i < maxLinks; ++i) m = Math.max(m, this.beamProg[i]);
+         return m;
+      }
+
       public void updateTile() {
          this.starScale = Mathf.approachDelta(this.starScale, 1.0F, 0.03F);
 
-         LaserBuild t = this.target();
-         if (t != null) {
-            this.tx = t.x;
-            this.ty = t.y;
-            this.beamProg = Mathf.approachDelta(this.beamProg, 1.0F, 0.05F);
-         } else {
-            this.beamProg = Mathf.approachDelta(this.beamProg, 0.0F, 0.1F);
+         boolean ready = false;
+         for (int i = 0; i < maxLinks; ++i) {
+            LaserBuild t = this.target(i);
+            if (t != null) {
+               this.tx[i] = t.x;
+               this.ty[i] = t.y;
+               this.beamProg[i] = Mathf.approachDelta(this.beamProg[i], 1.0F, 0.05F);
+               if (this.beamProg[i] >= 0.99F) ready = true;
+            } else {
+               this.beamProg[i] = Mathf.approachDelta(this.beamProg[i], 0.0F, 0.1F);
+            }
+         }
+
+         if (!ready) {
             this.hitTimer = 0.0F;
             return;
          }
-
-         if (this.beamProg < 0.99F) return;
          this.hitTimer += Time.delta;
          if (this.hitTimer >= hitInterval) {
             this.hitTimer %= hitInterval;
-            this.zap();
+            for (int i = 0; i < maxLinks; ++i) {
+               if (this.beamProg[i] >= 0.99F && this.target(i) != null) this.zap(this.tx[i], this.ty[i]);
+            }
          }
       }
 
       /**
-       * Finds everything under the laser. Runs on every peer so sparks show up for everybody,
+       * Finds everything under one laser. Runs on every peer so sparks show up for everybody,
        * but only the server / single player actually deals damage.
        */
-      void zap() {
+      void zap(final float x2, final float y2) {
          final float x1 = this.x;
          final float y1 = this.y;
-         final float x2 = this.tx;
-         final float y2 = this.ty;
          final boolean deal = !Vars.net.client();
          final Team me = this.team;
 
@@ -206,7 +261,9 @@ public class LaserBlock extends Block {
          Draw.rect(this.block.region, this.x, this.y);
          Draw.z(Layer.effect);
          float pulse = 0.8F + 0.2F * Mathf.sin(Time.time / 11.0F + (float)this.id * 0.37F);
-         if (this.beamProg > 0.001F) this.drawBeam(pulse);
+         for (int i = 0; i < maxLinks; ++i) {
+            if (this.beamProg[i] > 0.001F) this.drawBeam(i, pulse);
+         }
          this.drawStar(pulse);
          Draw.reset();
       }
@@ -215,7 +272,7 @@ public class LaserBlock extends Block {
          float s = Mathf.clamp(this.starScale);
          s = s * s * (3.0F - 2.0F * s);
          if (s <= 0.001F) return;
-         float boost = 1.0F + 0.45F * this.beamProg;
+         float boost = 1.0F + 0.3F * Math.min(this.linkCountShown(), 3);
          float tw = 0.94F + 0.06F * Mathf.sin(Time.time / 7.0F + (float)this.id);
 
          Draw.blend(Blending.additive);
@@ -236,10 +293,17 @@ public class LaserBlock extends Block {
          Drawf.light(this.x, this.y, 46.0F * s * boost, col, 0.65F * pulse * s);
       }
 
-      void drawBeam(float pulse) {
-         float p = this.beamProg;
-         float ex = this.x + (this.tx - this.x) * p;
-         float ey = this.y + (this.ty - this.y) * p;
+      /** Sum of laser growth values: the star glows brighter with every active laser. */
+      float linkCountShown() {
+         float n = 0.0F;
+         for (int i = 0; i < maxLinks; ++i) n += this.beamProg[i];
+         return n;
+      }
+
+      void drawBeam(int slot, float pulse) {
+         float p = this.beamProg[slot];
+         float ex = this.x + (this.tx[slot] - this.x) * p;
+         float ey = this.y + (this.ty[slot] - this.y) * p;
          float len = Mathf.dst(this.x, this.y, ex, ey);
          if (len < 0.5F) return;
          float ang = Angles.angle(this.x, this.y, ex, ey);
@@ -265,8 +329,8 @@ public class LaserBlock extends Block {
          Draw.color(hot, 0.85F * p);
          Lines.line(this.x, this.y, ex, ey);
 
-         // jittering electric arcs along the beam (same look on every client, seeded by time and block id)
-         Mathf.randomSeed((long)this.id * 131L + (long)(Time.time / 2.5F));
+         // jittering electric arcs along the beam (same look on every client, seeded by time, block id and slot)
+         Mathf.randomSeed((long)this.id * 131L + (long)slot * 17L + (long)(Time.time / 2.5F));
          int segs = Math.max(2, (int)(len / 9.0F));
          float nx = -Mathf.sinDeg(ang);
          float ny = Mathf.cosDeg(ang);
@@ -309,25 +373,27 @@ public class LaserBlock extends Block {
       public void drawConfigure() {
          Drawf.select(this.x, this.y, (float)this.block.size * 4.0F + 2.0F, Pal.accent);
          Drawf.dashCircle(this.x, this.y, range * 8.0F, col);
-         LaserBuild cur = this.target();
          Vars.indexer.eachBlock(this, range * 8.0F, (b) -> b != this && b.block == this.block, (b) -> {
-            boolean linked = cur == b;
+            boolean linked = this.hasLink(b.pos());
             Drawf.select(b.x, b.y, (float)b.block.size * 4.0F + 2.0F + (linked ? 0.0F : Mathf.absin(Time.time, 4.0F, 1.0F)), linked ? Pal.place : Pal.breakInvalid);
          });
-         if (cur != null) Drawf.dashLine(Pal.place, this.x, this.y, cur.x, cur.y);
+         for (int i = 0; i < maxLinks; ++i) {
+            LaserBuild t = this.target(i);
+            if (t != null) Drawf.dashLine(Pal.place, this.x, this.y, t.x, t.y);
+         }
          Draw.reset();
       }
 
-      /** Tap another Laser Block while this one is selected to link / unlink it. */
+      /** Tap another Laser Block while this one is selected to link / unlink it (up to maxLinks at once). */
       public boolean onConfigureBuildTapped(Building other) {
          if (other instanceof LaserBuild && other != this && other.team == this.team
             && Mathf.dst(this.x, this.y, other.x, other.y) <= range * 8.0F + 0.5F) {
-            if (this.link == other.pos()) {
-               this.configure(-1);
-            } else {
+            if (this.hasLink(other.pos())) {
+               this.configure(other.pos()); // toggles it off
+            } else if (this.linkCount() < maxLinks) {
                this.configure(other.pos());
                // a pair only needs one laser: drop the reverse link
-               if (((LaserBuild)other).link == this.pos()) other.configure(-1);
+               if (((LaserBuild)other).hasLink(this.pos())) other.configure(this.pos());
             }
             return false;
          }
@@ -335,21 +401,28 @@ public class LaserBlock extends Block {
       }
 
       public void pickedUp() {
-         this.link = -1;
+         this.clearLinks();
       }
 
-      public Point2 config() {
-         return this.link == -1 ? null : Point2.unpack(this.link).sub(this.tile.x, this.tile.y);
+      public Point2[] config() {
+         int n = this.linkCount();
+         if (n == 0) return null;
+         Point2[] out = new Point2[n];
+         int k = 0;
+         for (int i = 0; i < maxLinks; ++i) {
+            if (this.links[i] != -1) out[k++] = Point2.unpack(this.links[i]).sub(this.tile.x, this.tile.y);
+         }
+         return out;
       }
 
       public void write(Writes w) {
          super.write(w);
-         w.i(this.link);
+         for (int i = 0; i < maxLinks; ++i) w.i(this.links[i]);
       }
 
       public void read(Reads r, byte revision) {
          super.read(r, revision);
-         this.link = r.i();
+         for (int i = 0; i < maxLinks; ++i) this.links[i] = r.i();
       }
    }
 }

@@ -4,18 +4,26 @@ import arc.Core;
 import arc.graphics.Blending;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
+import arc.struct.Seq;
 import arc.util.Time;
+import arc.util.Tmp;
 import java.util.Map;
 import java.util.WeakHashMap;
 import mindustry.Vars;
 import mindustry.content.Fx;
+import mindustry.content.Items;
+import mindustry.core.Renderer;
 import mindustry.entities.bullet.BasicBulletType;
 import mindustry.gen.Unit;
 import mindustry.gen.UnitEntity;
+import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
+import mindustry.graphics.Pal;
+import mindustry.graphics.Trail;
 import mindustry.type.UnitType;
 import mindustry.type.Weapon;
 
@@ -25,10 +33,16 @@ public class SeraphUnit extends UnitType {
    static final float FOLD = 36.0F;
    // wing tips (sprite px), glow tint and trail colour: front (big) wings red, rear (small) wings gold
    static final float[][] TIPS = new float[][]{{29.0F, 75.0F}, {98.0F, 75.0F}, {39.0F, 82.0F}, {88.0F, 82.0F}};
-   static final Color[] GLOW = new Color[]{Color.valueOf("ff8a74"), Color.valueOf("ff8a74"), Color.valueOf("ffd27a"), Color.valueOf("ffd27a")};
-   static final Color[] TRAIL = new Color[]{Color.valueOf("ff6e5a"), Color.valueOf("ff6e5a"), Color.valueOf("ffbe3c"), Color.valueOf("ffbe3c")};
-   static final int TRAIL_LEN = 20;
-   static final Map<Unit, float[]> trails = new WeakHashMap();
+   // neon palette: fully saturated, bright
+   static final Color NEON_RED = Color.valueOf("ff2a5c");
+   static final Color NEON_GOLD = Color.valueOf("ffe81a");
+   static final Color TRAIL_RED = Color.valueOf("ff1f55");
+   static final Color TRAIL_GOLD = Color.valueOf("ffdd00");
+   static final Color ENGINE = Color.valueOf("ff5a2a");
+   static final Color[] GLOW = new Color[]{NEON_RED, NEON_RED, NEON_GOLD, NEON_GOLD};
+   static final Color[] TRAIL = new Color[]{TRAIL_RED, TRAIL_RED, TRAIL_GOLD, TRAIL_GOLD};
+   static final int TRAIL_LEN = 34;
+   static final Map<Unit, Trail[]> trails = new WeakHashMap();
    static final float[] tmp = new float[2];
    final TextureRegion[] wingRegions = new TextureRegion[4];
 
@@ -50,9 +64,18 @@ public class SeraphUnit extends UnitType {
       this.buildSpeed = 0.8F;
       this.mineTier = 1;
       this.mineSpeed = 0.5F;
+      // copper (hardness 1), lead (1) and scrap (0) are all within tier 1
+      this.mineItems = Seq.with(Items.copper, Items.lead, Items.scrap);
+      this.mineFloor = true;
+      this.mineWalls = false;
       this.itemCapacity = 30;
       this.engineOffset = 6.0F;
       this.engineSize = 2.4F;
+      // sharp engine trail: the game's own tapered trail behind the rear flame
+      this.engineColor = ENGINE;
+      this.trailColor = ENGINE;
+      this.trailLength = 30;
+      this.trailScl = 0.9F;
       this.outlines = false;
       this.weapons.add(new Weapon() {
          {
@@ -76,6 +99,17 @@ public class SeraphUnit extends UnitType {
       });
    }
 
+   /** The cell next to the Seraph glows in a more saturated, brighter version of the team colour. */
+   @Override
+   public Color cellColor(Unit unit) {
+      float f = Mathf.clamp(unit.healthf());
+      Color vivid = Tmp.c2.set(unit.team.color);
+      vivid.saturation(Math.min(1.0F, vivid.saturation() * 1.4F + 0.25F));
+      vivid.value(1.0F);
+      float k = Mathf.clamp(0.3F + 0.7F * (f + Mathf.absin(Time.time, Math.max(f * 5.0F, 1.0F), 1.0F - f)));
+      return Tmp.c1.set(Color.black).lerp(vivid, k);
+   }
+
    public void load() {
       super.load();
 
@@ -95,24 +129,27 @@ public class SeraphUnit extends UnitType {
       super.update(var1);
       if (!Vars.headless) {
          float var2 = SeraphAnim.age(var1);
-         float[] var3 = (float[])trails.get(var1);
+         Trail[] var3 = trails.get(var1);
          if (var3 == null) {
-            var3 = new float[2 + 8 * TRAIL_LEN];
+            var3 = new Trail[4];
+            for(int var6 = 0; var6 < 4; ++var6) {
+               var3[var6] = new Trail(TRAIL_LEN);
+            }
+
             trails.put(var1, var3);
          }
 
          if (var2 < 36.0F) {
-            var3[1] = 0.0F;
+            for(int var6 = 0; var6 < 4; ++var6) {
+               var3[var6].clear();
+            }
          } else {
             float var4 = SeraphAnim.wings(var2);
-            int var5 = ((int)var3[0] + 1) % TRAIL_LEN;
-            var3[0] = (float)var5;
-            var3[1] = Math.min(var3[1] + 1.0F, (float)TRAIL_LEN);
 
+            // one game Trail per wing: a continuous tapered ribbon, so there are no visible joints between segments
             for(int var6 = 0; var6 < 4; ++var6) {
                wingPoint(var1, var6, TIPS[var6][0], TIPS[var6][1], var4, tmp);
-               var3[2 + (var6 * TRAIL_LEN + var5) * 2] = tmp[0];
-               var3[3 + (var6 * TRAIL_LEN + var5) * 2] = tmp[1];
+               var3[var6].update(tmp[0], tmp[1], 1.0F);
             }
 
          }
@@ -152,14 +189,14 @@ public class SeraphUnit extends UnitType {
       }
 
       Draw.blend(Blending.additive);
-      float var18 = 0.7F + 0.3F * (float)Math.sin((double)(Time.time / 14.0F + (float)var1.id));
+      float var18 = 1.0F; // constant wing light, no pulsing
 
       for(int var19 = 0; var19 < 4; ++var19) {
          float var20 = WINGS[var19][2] * 36.0F * (1.0F - var2);
          wingPoint(var1, var19, 64.0F, 64.0F, var2, tmp);
-         Draw.color(GLOW[var19], 0.5F * var18 * var17);
+         Draw.color(GLOW[var19], 0.8F * var18 * var17);
          Draw.rect(this.wingRegions[var19], tmp[0], tmp[1], var4 + var20);
-         Draw.color(GLOW[var19], 0.14F * var18 * var17);
+         Draw.color(GLOW[var19], 0.32F * var18 * var17);
          Draw.rect(this.wingRegions[var19], tmp[0], tmp[1], 36.0F, 36.0F, var4 + var20);
       }
 
@@ -185,24 +222,61 @@ public class SeraphUnit extends UnitType {
       var5[1] = var0.y + var16 * var8 + var17 * var7;
    }
 
+   /** The mining beam is a glowing purple laser (same palette as the Laser Block) instead of the default grey one. */
+   @Override
+   public void drawMiningBeam(Unit unit, float px, float py) {
+      if (!unit.mining()) return;
+      float ex = unit.mineTile.worldx() + Mathf.sin(Time.time + 48.0F, 12.0F, 1.0F);
+      float ey = unit.mineTile.worldy() + Mathf.sin(Time.time + 48.0F, 14.0F, 1.0F);
+      float a = Renderer.unitLaserOpacity;
+      float pulse = 0.85F + 0.15F * Mathf.sin(Time.time / 4.0F);
+
+      Draw.z(Layer.flyingUnit + 0.1F);
+      Draw.blend(Blending.additive);
+      Lines.stroke(6.0F * pulse);
+      Draw.color(LaserBlock.col, 0.14F * a);
+      Lines.line(px, py, ex, ey);
+      Lines.stroke(3.4F * pulse);
+      Draw.color(LaserBlock.col, 0.35F * a);
+      Lines.line(px, py, ex, ey);
+      Lines.stroke(1.4F);
+      Draw.color(LaserBlock.hot, 0.95F * a);
+      Lines.line(px, py, ex, ey);
+
+      // glow at both ends and sparks where the beam burns the ore
+      Fill.light(ex, ey, 18, 8.0F * pulse, Tmp.c1.set(LaserBlock.col).a(0.6F * a), Tmp.c2.set(LaserBlock.col).a(0.0F));
+      Fill.light(px, py, 14, 5.0F * pulse, Tmp.c1.set(LaserBlock.col).a(0.5F * a), Tmp.c2.set(LaserBlock.col).a(0.0F));
+      Mathf.randomSeed((long)unit.id * 7L + (long)(Time.time / 3.0F));
+      Lines.stroke(1.0F);
+      Draw.color(LaserBlock.hot, 0.9F * a);
+      for(int i = 0; i < 4; ++i) {
+         Lines.lineAngle(ex, ey, Mathf.random(360.0F), Mathf.random(1.5F, 5.5F));
+      }
+
+      Draw.blend();
+      Drawf.light(px, py, ex, ey, 26.0F, LaserBlock.col, 0.5F * a);
+
+      if (unit.isLocal()) {
+         Lines.stroke(1.0F, Pal.accent);
+         Lines.poly(unit.mineTile.worldx(), unit.mineTile.worldy(), 4, 4.0F * Mathf.sqrt2, Time.time);
+      }
+
+      Draw.reset();
+   }
+
    void drawTrails(Unit var1, float var2) {
-      float[] var3 = (float[])trails.get(var1);
-      if (var3 != null && !(var3[1] < 2.0F)) {
+      Trail[] var3 = trails.get(var1);
+      if (var3 != null) {
          float var4 = var1.elevation > 0.5F ? (this.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit) : this.groundLayer;
          Draw.z(var4 - 0.035F);
          Draw.blend(Blending.additive);
-         int var5 = (int)var3[0];
-         int var6 = (int)var3[1];
 
          for(int var7 = 0; var7 < 4; ++var7) {
-            for(int var8 = 0; var8 < var6 - 1; ++var8) {
-               int var9 = ((var5 - var8) % TRAIL_LEN + TRAIL_LEN) % TRAIL_LEN;
-               int var10 = ((var5 - var8 - 1) % TRAIL_LEN + TRAIL_LEN) % TRAIL_LEN;
-               float var11 = 1.0F - ((float)var8 + 0.5F) / (float)TRAIL_LEN;
-               Draw.color(TRAIL[var7], var11 * var11 * 0.9F * var2);
-               Lines.stroke(0.3F + 0.9F * var11);
-               Lines.line(var3[2 + (var7 * TRAIL_LEN + var9) * 2], var3[3 + (var7 * TRAIL_LEN + var9) * 2], var3[2 + (var7 * TRAIL_LEN + var10) * 2], var3[3 + (var7 * TRAIL_LEN + var10) * 2]);
-            }
+            if (var3[var7].size() < 2) continue;
+            // wide faint pass for the glow, thin bright pass for the core
+            var3[var7].draw(Tmp.c1.set(TRAIL[var7]).a(0.22F * var2), 2.2F);
+            var3[var7].draw(Tmp.c1.set(TRAIL[var7]).a(0.85F * var2), 1.1F);
+            var3[var7].draw(Tmp.c1.set(Color.white).a(0.35F * var2), 0.35F);
          }
 
          Draw.blend();

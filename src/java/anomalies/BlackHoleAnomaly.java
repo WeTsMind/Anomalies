@@ -7,6 +7,7 @@ import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
 import arc.math.Angles;
 import arc.math.Mathf;
+import arc.math.Rand;
 import arc.util.Time;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,10 +27,12 @@ public class BlackHoleAnomaly extends Anomaly {
    static final float eatTime = 3600.0F;
    static final float holeLife = 18000.0F;
    static final float R0 = 9.0F;
-   final float s;
-   final int RT;
-   final int W;
-   final float RPX;
+   float s;
+   int RT;
+   int W;
+   float RPX;
+   /** client only: first clientUpdate() call after (re)creation */
+   boolean clientInit;
    static final Color warm = Color.valueOf("ffd78a");
    static final Color soft = Color.valueOf("fff3d6");
    static final Color white = Color.valueOf("ffffff");
@@ -80,11 +83,83 @@ public class BlackHoleAnomaly extends Anomaly {
       this.bc = new Color[256];
       this.doomed = new ArrayList();
       this.dd = new ArrayList();
+      this.setScale(var1);
+      this.tileRadius = 1;
+   }
+
+   /** Alpha scale. Also called on clients when the server re-sends the scale, so an alpha hole can never stay "normal". */
+   void setScale(float var1) {
+      if (this.s == var1 && this.RT != 0) {
+         return;
+      }
+
       this.s = var1;
       this.RT = Math.round(10.0F * var1);
       this.W = this.RT * 2 + 1;
       this.RPX = (float)this.RT * 8.0F;
-      this.tileRadius = 1;
+      this.order = null;
+      this.eaten = 0;
+      this.clientInit = false;
+   }
+
+   /**
+    * Client side. AnomalyManager.update() is not run on clients, so the hole never grew and never showed the
+    * blocks being sucked in. This repeats the server's eating schedule (same tile order, same timing) but only
+    * records the visual particles; the world itself is changed by the server and reaches clients as normal tile updates.
+    */
+   public void clientUpdate() {
+      float var1 = 10980.0F;
+      if (this.age < var1) {
+         return;
+      }
+
+      if (this.order == null) {
+         this.buildOrder();
+      }
+
+      int var2 = Math.round(this.x / 8.0F);
+      int var3 = Math.round(this.y / 8.0F);
+      int var4 = (int)(Math.min(1.0F, (this.age - var1) / 3600.0F) * (float)this.order.length);
+      if (!this.clientInit) {
+         // joined in the middle of the meal: skip the backlog instead of spawning hundreds of particles at once
+         this.clientInit = true;
+         this.eaten = Math.max(this.eaten, var4 - 6);
+      }
+
+      while(this.eaten < var4) {
+         int var5 = this.order[this.eaten++];
+         this.visualConsume(var2 + var5 / this.W - this.RT, var3 + var5 % this.W - this.RT);
+      }
+
+      if (!this.boom && this.life - this.age <= 20.0F) {
+         this.boom = true;
+
+         try {
+            blast.at(this.x, this.y);
+            Effect.shake(8.0F, 30.0F, this.x, this.y);
+         } catch (Throwable var6) {
+         }
+      }
+
+   }
+
+   void visualConsume(int var1, int var2) {
+      Tile var3 = Vars.world.tile(var1, var2);
+      if (var3 != null) {
+         boolean var4 = AnomalySettings.destroyWorld();
+         if (var4 || var3.build != null) {
+            int var5 = this.bn++ & 255;
+            this.bx[var5] = (float)var1 * 8.0F;
+            this.by[var5] = (float)var2 * 8.0F;
+            this.bs[var5] = this.age;
+
+            try {
+               this.bc[var5] = var3.block() != Blocks.air ? var3.block().mapColor : var3.floor().mapColor;
+            } catch (Throwable var6) {
+               this.bc[var5] = white;
+            }
+         }
+      }
    }
 
    public Color color() {
@@ -104,9 +179,11 @@ public class BlackHoleAnomaly extends Anomaly {
       }
 
       this.order = Arrays.copyOf(var2, var1);
+      // seeded from the position so the server and every client eat the tiles in exactly the same order
+      Rand var8 = new Rand((long)Float.floatToIntBits(this.x) * 31L + (long)Float.floatToIntBits(this.y) + (long)this.RT * 7919L);
 
       for(int var6 = var1 - 1; var6 > 0; --var6) {
-         int var7 = Mathf.random(var6);
+         int var7 = var8.random(var6);
          int var5 = this.order[var6];
          this.order[var6] = this.order[var7];
          this.order[var7] = var5;

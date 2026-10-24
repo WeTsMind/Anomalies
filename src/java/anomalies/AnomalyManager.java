@@ -285,10 +285,14 @@ public class AnomalyManager {
          Anomaly var1 = (Anomaly)var0.prov.get();
          int var2 = var1.tileRadius + 2;
          if (Vars.world.width() > var2 * 2 && Vars.world.height() > var2 * 2) {
+            if (var1 instanceof WhirlpoolAnomaly) {
+               return spawnWhirlpool(var1, var2);
+            }
+
             for(int var3 = 0; var3 < 300; ++var3) {
                int var5 = Mathf.random(var2, Vars.world.width() - 1 - var2);
                int var4;
-               if (free(var5, var4 = Mathf.random(var2, Vars.world.height() - 1 - var2), var1.tileRadius)) {
+               if (free(var5, var4 = Mathf.random(var2, Vars.world.height() - 1 - var2), var1.tileRadius) && waterOk(var1, var5, var4)) {
                   place(var1, (float)(var5 * 8), (float)(var4 * 8));
                   return true;
                }
@@ -301,6 +305,61 @@ public class AnomalyManager {
       } else {
          return false;
       }
+   }
+
+   /** Only these anomalies may appear on liquid (water) floor; everything else keeps off it. */
+   static boolean allowedOnWater(Anomaly var0) {
+      return var0 instanceof MirrorAnomaly || var0 instanceof WarpAnomaly || var0 instanceof WhirlpoolAnomaly;
+   }
+
+   /** False if the anomaly is not allowed on water and any tile of its footprint is a liquid floor. */
+   static boolean waterOk(Anomaly var0, int var1, int var2) {
+      if (allowedOnWater(var0)) {
+         return true;
+      }
+
+      int var3 = var0.tileRadius;
+
+      for(int var4 = -var3; var4 <= var3; ++var4) {
+         for(int var5 = -var3; var5 <= var3; ++var5) {
+            if (var4 * var4 + var5 * var5 <= var3 * var3 + 1) {
+               Tile var6 = Vars.world.tile(var1 + var4, var2 + var5);
+               if (var6 != null && var6.floor().isLiquid) {
+                  return false;
+               }
+            }
+         }
+      }
+
+      return true;
+   }
+
+   /** The whirlpool needs liquid floor, so candidates are taken from the liquid tiles instead of random guessing. */
+   static boolean spawnWhirlpool(Anomaly var0, int var1) {
+      IntSeq var2 = new IntSeq();
+      int var3 = Vars.world.width();
+      int var4 = Vars.world.height();
+
+      for(int var5 = var1; var5 < var3 - var1; ++var5) {
+         for(int var6 = var1; var6 < var4 - var1; ++var6) {
+            Tile var7 = Vars.world.tile(var5, var6);
+            if (var7 != null && var7.floor().isLiquid) {
+               var2.add(var5 * var4 + var6);
+            }
+         }
+      }
+
+      for(int var8 = 0; var8 < 300 && var2.size > 0; ++var8) {
+         int var9 = var2.get(Mathf.random(var2.size - 1));
+         int var10 = var9 / var4;
+         int var11 = var9 % var4;
+         if (WhirlpoolAnomaly.onLiquid(var10, var11) && free(var10, var11, var0.tileRadius)) {
+            place(var0, (float)(var10 * 8), (float)(var11 * 8));
+            return true;
+         }
+      }
+
+      return false;
    }
 
    public static Anomaly spawn(AnomalyType var0, float var1, float var2) {

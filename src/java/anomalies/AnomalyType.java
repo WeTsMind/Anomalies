@@ -12,7 +12,8 @@ public enum AnomalyType {
    blackhole(BlackHoleAnomaly::new, () -> new BlackHoleAnomaly(AlphaSettings.scale())),
    warp(WarpAnomaly::new, () -> new WarpAnomaly(AlphaSettings.scale())),
    fire(FireBurstAnomaly::new),
-   toxic(ToxicAnomaly::new);
+   toxic(ToxicAnomaly::new),
+   whirlpool(WhirlpoolAnomaly::new);
 
    public static final AnomalyType[] all = values();
    public final Prov<Anomaly> prov;
@@ -31,6 +32,6 @@ public enum AnomalyType {
 
    // $FF: synthetic method
    private static AnomalyType[] $values() {
-      return new AnomalyType[]{mirror, distortion, time, vortex, ball, blackhole, warp, fire, toxic};
+      return new AnomalyType[]{mirror, distortion, time, vortex, ball, blackhole, warp, fire, toxic, whirlpool};
    }
 }

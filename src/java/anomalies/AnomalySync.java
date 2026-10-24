@@ -113,6 +113,14 @@ public class AnomalySync {
          var0.update();
       }
 
+      if (var0 instanceof BlackHoleAnomaly && var0.age < var0.life) {
+         ((BlackHoleAnomaly)var0).clientUpdate();
+      }
+
+      if (var0 instanceof DistortionAnomaly && var0.age < var0.life) {
+         ((DistortionAnomaly)var0).clientUpdate();
+      }
+
       if (var0 instanceof FireBurstAnomaly && var0.age < var0.life) {
          ((FireBurstAnomaly)var0).clientUpdate();
       }
@@ -188,7 +196,12 @@ public class AnomalySync {
             for(Map.Entry var17 : sent.entrySet()) {
                Anomaly var18 = (Anomaly)var17.getKey();
                if (!var18.dead) {
-                  Call.clientPacketUnreliable("anomalies-sync", "l|" + var17.getValue() + "|" + var18.life + "|" + var18.age);
+                  String var19 = "l|" + var17.getValue() + "|" + var18.life + "|" + var18.age;
+               if (var18 instanceof BlackHoleAnomaly) {
+                  var19 = var19 + "|" + ((BlackHoleAnomaly)var18).s; // alpha scale is re-sent too
+               }
+
+               Call.clientPacketUnreliable("anomalies-sync", var19);
                }
             }
          }
@@ -428,6 +441,9 @@ public class AnomalySync {
             if (var19 != null) {
                var19.life = Float.parseFloat(var1[2]);
                var19.age = Float.parseFloat(var1[3]);
+               if (var19 instanceof BlackHoleAnomaly && var1.length > 4) {
+                  ((BlackHoleAnomaly)var19).setScale(Float.parseFloat(var1[4]));
+               }
             }
          } else if (var1[0].equals("p")) {
             applyPush(Float.parseFloat(var1[1]), Float.parseFloat(var1[2]), Float.parseFloat(var1[3]), Float.parseFloat(var1[4]), var1[5].equals("1"));

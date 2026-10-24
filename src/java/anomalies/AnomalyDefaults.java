@@ -38,6 +38,9 @@ public class AnomalyDefaults {
          case "toxic" -> {
             return 15;
          }
+         case "whirlpool" -> {
+            return 20;
+         }
          default -> {
             return 0;
          }
