@@ -18,15 +18,14 @@ import mindustry.content.Fx;
 import mindustry.content.Items;
 import mindustry.core.Renderer;
 import mindustry.entities.bullet.BasicBulletType;
-import mindustry.gen.Sounds;
 import mindustry.gen.Unit;
 import mindustry.gen.UnitEntity;
 import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
+import mindustry.graphics.Trail;
 import mindustry.type.UnitType;
 import mindustry.type.Weapon;
-import mindustry.world.blocks.storage.CoreBlock;
 
 public class SeraphUnit extends UnitType {
    // wing root in sprite pixels (128x128, y down) and fold side (+1 left, -1 right)
@@ -34,22 +33,16 @@ public class SeraphUnit extends UnitType {
    static final float FOLD = 36.0F;
    // wing tips (sprite px), glow tint and trail colour: front (big) wings red, rear (small) wings gold
    static final float[][] TIPS = new float[][]{{29.0F, 75.0F}, {98.0F, 75.0F}, {39.0F, 82.0F}, {88.0F, 82.0F}};
-   // bright, glowing coral / gold (same hues as the wing sprites, just lighter)
-   static final Color NEON_RED = Color.valueOf("ff9a84");
-   static final Color NEON_GOLD = Color.valueOf("ffe08a");
-   // trail colours sampled from the wing sprites: front wings ff4f41 / ff9967, rear wings ff9400 / ffb857
-   static final Color TRAIL_RED = Color.valueOf("ff4f41");
-   static final Color TRAIL_GOLD = Color.valueOf("ff9400");
-   static final Color HEAD_RED = Color.valueOf("ff9967");
-   static final Color HEAD_GOLD = Color.valueOf("ffb857");
+   // neon palette: fully saturated, bright
+   static final Color NEON_RED = Color.valueOf("ff2a5c");
+   static final Color NEON_GOLD = Color.valueOf("ffe81a");
+   static final Color TRAIL_RED = Color.valueOf("ff1f55");
+   static final Color TRAIL_GOLD = Color.valueOf("ffdd00");
    static final Color ENGINE = Color.valueOf("ff5a2a");
    static final Color[] GLOW = new Color[]{NEON_RED, NEON_RED, NEON_GOLD, NEON_GOLD};
    static final Color[] TRAIL = new Color[]{TRAIL_RED, TRAIL_RED, TRAIL_GOLD, TRAIL_GOLD};
-   static final Color[] HEAD = new Color[]{HEAD_RED, HEAD_RED, HEAD_GOLD, HEAD_GOLD};
-   /** half width of the ribbon at the wing tip, world units (thin) */
-   static final float TRAIL_HALF = 0.55F;
    static final int TRAIL_LEN = 34;
-   static final Map<Unit, WingTrail[]> trails = new WeakHashMap();
+   static final Map<Unit, Trail[]> trails = new WeakHashMap();
    static final float[] tmp = new float[2];
    final TextureRegion[] wingRegions = new TextureRegion[4];
 
@@ -76,7 +69,7 @@ public class SeraphUnit extends UnitType {
       this.mineFloor = true;
       this.mineWalls = false;
       this.itemCapacity = 30;
-      this.engineOffset = 1.5F; // flame starts right under the cell, not in the air behind the body
+      this.engineOffset = 6.0F;
       this.engineSize = 2.4F;
       // sharp engine trail: the game's own tapered trail behind the rear flame
       this.engineColor = ENGINE;
@@ -84,28 +77,26 @@ public class SeraphUnit extends UnitType {
       this.trailLength = 30;
       this.trailScl = 0.9F;
       this.outlines = false;
-      // the purple laser: one pulse every 6 ticks while fire is held, see SeraphBeam
       this.weapons.add(new Weapon() {
          {
-            this.reload = 6.0F;
-            this.x = 0.0F;
-            this.y = 8.0F;
-            this.mirror = false;
+            this.reload = 18.0F;
+            this.x = 3.0F;
+            this.y = 0.0F;
             this.top = false;
             this.rotate = true;
-            this.shootSound = Sounds.none;
-            this.ejectEffect = Fx.none;
-            this.bullet = new SeraphBeam();
+            this.ejectEffect = Fx.casing1;
+            this.bullet = new BasicBulletType(2.8F, 12.0F) {
+               {
+                  this.width = 7.0F;
+                  this.height = 9.0F;
+                  this.lifetime = 55.0F;
+                  this.shootEffect = Fx.shootSmall;
+                  this.smokeEffect = Fx.shootSmallSmoke;
+                  this.buildingDamageMultiplier = 0.01F;
+               }
+            };
          }
       });
-   }
-
-   /** Brighter, more saturated version of a team colour (the cell colour). */
-   static Color vivid(mindustry.game.Team t) {
-      Color v = Tmp.c2.set(t.color);
-      v.saturation(Math.min(1.0F, v.saturation() * 1.4F + 0.25F));
-      v.value(1.0F);
-      return v;
    }
 
    /** The cell next to the Seraph glows in a more saturated, brighter version of the team colour. */
@@ -136,24 +127,13 @@ public class SeraphUnit extends UnitType {
 
    public void update(Unit var1) {
       super.update(var1);
-      // while the lids open the Seraph sits inside the core (the core draws it); then it flies out
-      float var0 = SeraphAnim.age(var1);
-      if (var0 < SeraphAnim.OPEN_END) {
-         CoreBlock.CoreBuild var9 = var1.closestCore();
-         if (var9 != null) var1.set(var9.x, var9.y);
-         var1.vel.setZero();
-         var1.isShooting(false);
-      } else if (var0 < 1.0E8F && SeraphAnim.released.add(var1)) {
-         var1.impulse(0.0F, 3.0F);
-      }
-
       if (!Vars.headless) {
          float var2 = SeraphAnim.age(var1);
-         WingTrail[] var3 = trails.get(var1);
+         Trail[] var3 = trails.get(var1);
          if (var3 == null) {
-            var3 = new WingTrail[4];
+            var3 = new Trail[4];
             for(int var6 = 0; var6 < 4; ++var6) {
-               var3[var6] = new WingTrail(TRAIL_LEN);
+               var3[var6] = new Trail(TRAIL_LEN);
             }
 
             trails.put(var1, var3);
@@ -166,10 +146,10 @@ public class SeraphUnit extends UnitType {
          } else {
             float var4 = SeraphAnim.wings(var2);
 
-            // one thin ribbon per wing (mitred joints, see WingTrail), so there are no visible seams between segments
+            // one game Trail per wing: a continuous tapered ribbon, so there are no visible joints between segments
             for(int var6 = 0; var6 < 4; ++var6) {
                wingPoint(var1, var6, TIPS[var6][0], TIPS[var6][1], var4, tmp);
-               var3[var6].add(tmp[0], tmp[1]);
+               var3[var6].update(tmp[0], tmp[1], 1.0F);
             }
 
          }
@@ -178,7 +158,6 @@ public class SeraphUnit extends UnitType {
 
    public void draw(Unit var1) {
       float var2 = SeraphAnim.age(var1);
-      if (var2 < SeraphAnim.OPEN_END) return;
       if (var2 >= 36.0F) {
          float var3 = SeraphAnim.wingAlpha(var2);
          this.drawTrails(var1, var3);
@@ -286,76 +265,22 @@ public class SeraphUnit extends UnitType {
    }
 
    void drawTrails(Unit var1, float var2) {
-      WingTrail[] var3 = trails.get(var1);
+      Trail[] var3 = trails.get(var1);
       if (var3 != null) {
          float var4 = var1.elevation > 0.5F ? (this.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit) : this.groundLayer;
          Draw.z(var4 - 0.035F);
          Draw.blend(Blending.additive);
 
          for(int var7 = 0; var7 < 4; ++var7) {
-            var3[var7].draw(TRAIL[var7], HEAD[var7], TRAIL_HALF, var2);
+            if (var3[var7].size() < 2) continue;
+            // wide faint pass for the glow, thin bright pass for the core
+            var3[var7].draw(Tmp.c1.set(TRAIL[var7]).a(0.22F * var2), 2.2F);
+            var3[var7].draw(Tmp.c1.set(TRAIL[var7]).a(0.85F * var2), 1.1F);
+            var3[var7].draw(Tmp.c1.set(Color.white).a(0.35F * var2), 0.35F);
          }
 
          Draw.blend();
          Draw.reset();
-      }
-   }
-
-   /** Fixed-length point history drawn as ONE ribbon: neighbouring quads share the same mitred edge, so there are no gaps or double-bright overlaps. */
-   static class WingTrail {
-      final float[] pts;
-      int n;
-
-      WingTrail(int len) {
-         pts = new float[len * 2];
-      }
-
-      void clear() {
-         n = 0;
-      }
-
-      int size() {
-         return n;
-      }
-
-      void add(float x, float y) {
-         int max = pts.length / 2;
-         if (n > 0) {
-            float dx = x - pts[(n - 1) * 2], dy = y - pts[(n - 1) * 2 + 1];
-            if (dx * dx + dy * dy < 0.0004F) return; // standing still: do not pile up points
-         }
-         if (n == max) {
-            System.arraycopy(pts, 2, pts, 0, pts.length - 2);
-            n--;
-         }
-         pts[n * 2] = x;
-         pts[n * 2 + 1] = y;
-         n++;
-      }
-
-      void draw(Color tail, Color head, float half, float alpha) {
-         if (n < 2) return;
-         float px = 0.0F, py = 1.0F; // last valid normal
-         float lx = 0.0F, ly = 0.0F, lc = 0.0F; // previous left/right/colour
-         float rx = 0.0F, ry = 0.0F;
-         for(int i = 0; i < n; ++i) {
-            int a = Math.max(i - 1, 0), b = Math.min(i + 1, n - 1);
-            float dx = pts[b * 2] - pts[a * 2], dy = pts[b * 2 + 1] - pts[a * 2 + 1];
-            float len = (float)Math.sqrt(dx * dx + dy * dy);
-            if (len > 1.0E-4F) {
-               px = -dy / len;
-               py = dx / len;
-            }
-            float t = i / (float)(n - 1); // 0 = tail, 1 = wing tip
-            float w = half * t;
-            float c = Tmp.c1.set(tail).lerp(head, t).a(alpha * t * t).toFloatBits();
-            float x = pts[i * 2], y = pts[i * 2 + 1];
-            float ax = x + px * w, ay = y + py * w, bx = x - px * w, by = y - py * w;
-            if (i > 0) {
-               Fill.quad(lx, ly, lc, rx, ry, lc, bx, by, c, ax, ay, c);
-            }
-            lx = ax; ly = ay; rx = bx; ry = by; lc = c;
-         }
       }
    }
 }

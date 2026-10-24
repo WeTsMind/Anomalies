@@ -9,7 +9,6 @@ import arc.graphics.g2d.Lines;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
 import arc.math.geom.Geometry;
-import arc.scene.ui.layout.Table;
 import arc.util.Eachable;
 import arc.util.Time;
 import arc.util.io.Reads;
@@ -23,7 +22,6 @@ import mindustry.gen.Building;
 import mindustry.graphics.Layer;
 import mindustry.type.Category;
 import mindustry.type.ItemStack;
-import mindustry.ui.Styles;
 import mindustry.world.Block;
 import mindustry.world.Tile;
 import mindustry.world.blocks.defense.Wall;
@@ -50,10 +48,6 @@ public class WallBreaker extends Block {
       this.health = 400;
       this.requirements(Category.effect, BuildVisibility.shown, ItemStack.with(new Object[]{Items.plastanium, 50, Items.surgeAlloy, 5, Items.silicon, 20}));
       this.consumePower(2.0F);
-      this.configurable = true;
-      this.saveConfig = true;
-      // how many tiles deep in front of the block it reaches and breaks (1..5)
-      this.config(Integer.class, (BreakerBuild b, Integer v) -> b.depth = Mathf.clamp(v, 1, 5));
       this.buildType = () -> new BreakerBuild();
    }
 
@@ -84,10 +78,6 @@ public class WallBreaker extends Block {
       final float[] beam = new float[3];
       float glowFade;
       final Tile[] targets = new Tile[2];
-      /** How many tiles in front of the block the lasers reach: 1..5. */
-      int depth = 1;
-      /** Distance (0 = right in front of the block) of the wall each lane is currently cutting. */
-      final int[] laneDepth = new int[2];
 
       int laneX(int lane) {
          switch (this.rotation) {
@@ -109,27 +99,8 @@ public class WallBreaker extends Block {
 
       /** The wall tile in front of the block on the given lane, or null if there is nothing to break. */
       Tile laneTarget(int lane) {
-         int dx = Geometry.d4x(this.rotation);
-         int dy = Geometry.d4y(this.rotation);
-         for (int d = 0; d < this.depth; ++d) {
-            Tile t = Vars.world.tile(this.laneX(lane) + dx * d, this.laneY(lane) + dy * d);
-            if (WallBreaker.breakable(t)) {
-               this.laneDepth[lane] = d;
-               return t;
-            }
-         }
-         return null;
-      }
-
-      public void buildConfiguration(Table table) {
-         for (int i = 1; i <= 5; ++i) {
-            final int n = i;
-            table.button(String.valueOf(i), Styles.togglet, () -> this.configure(n)).size(40.0F).update((b) -> b.setChecked(this.depth == n));
-         }
-      }
-
-      public Integer config() {
-         return this.depth;
+         Tile t = Vars.world.tile(this.laneX(lane), this.laneY(lane));
+         return WallBreaker.breakable(t) ? t : null;
       }
 
       public void updateTile() {
@@ -228,7 +199,6 @@ public class WallBreaker extends Block {
          float heat1 = Mathf.clamp(this.progress[1] / 1800.0F);
 
          Draw.z(Layer.effect);
-         int centerDepth = this.targets[0] != null && this.targets[1] != null ? Math.min(this.laneDepth[0], this.laneDepth[1]) : (this.targets[0] != null ? this.laneDepth[0] : this.laneDepth[1]);
 
          for (int k = 0; k < 3; ++k) {
             float b = this.beam[k];
@@ -236,23 +206,20 @@ public class WallBreaker extends Block {
 
             float lat;
             float heat;
-            int reachDepth;
             if (k == 1) {
                lat = 0.0F;
                heat = Math.max(heat0, heat1);
-               reachDepth = centerDepth;
             } else {
                int lane = k == 0 ? 0 : 1;
                float wx = this.laneX(lane) * 8.0F;
                float wy = this.laneY(lane) * 8.0F;
                lat = ((wx - this.x) * px + (wy - this.y) * py) * 1.2F;
                heat = lane == 0 ? heat0 : heat1;
-               reachDepth = this.laneDepth[lane];
             }
 
             // distance along the facing: emitters sit on the sprite, the wall face is 8 units from the centre
             float f0 = k == 1 ? 5.5F : 2.5F;
-            float f1 = f0 + (9.5F + 8.0F * (float)reachDepth - f0) * b;
+            float f1 = f0 + (9.5F - f0) * b;
             float sx = this.x + dx * f0 + px * lat;
             float sy = this.y + dy * f0 + py * lat;
             float ex = this.x + dx * f1 + px * lat;
@@ -263,7 +230,7 @@ public class WallBreaker extends Block {
             if (hit && k != 1) {
                Draw.blend(Blending.additive);
                Draw.color(WallBreaker.laserCol, 0.15F + 0.45F * heat);
-               Fill.square(this.x + dx * (12.0F + 8.0F * (float)reachDepth) + px * (lat / 1.2F), this.y + dy * (12.0F + 8.0F * (float)reachDepth) + py * (lat / 1.2F), 4.0F);
+               Fill.square(this.x + dx * 12.0F + px * (lat / 1.2F), this.y + dy * 12.0F + py * (lat / 1.2F), 4.0F);
                Draw.blend();
             }
 
@@ -305,7 +272,6 @@ public class WallBreaker extends Block {
          super.write(w);
          w.f(this.progress[0]);
          w.f(this.progress[1]);
-         w.b(this.depth);
       }
 
       public void read(Reads r, byte revision) {
@@ -316,11 +282,6 @@ public class WallBreaker extends Block {
          } catch (Throwable ignored) {
             // old save with a single progress value
             this.progress[1] = 0.0F;
-         }
-         try {
-            this.depth = Mathf.clamp((int)r.b(), 1, 5);
-         } catch (Throwable ignored) {
-            this.depth = 1;
          }
       }
    }
