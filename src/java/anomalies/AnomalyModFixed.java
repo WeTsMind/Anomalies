@@ -11,6 +11,9 @@ public class AnomalyModFixed extends AnomalyModGolden {
    public static UnitType seraph;
    public static SeraphCore seraphCore;
    public static Block laserBlock;
+   public static Block hologramBlock;
+   public static Block worldHologramBlock;
+   public static Block decryptorBlock;
 
    public void loadContent() {
       super.loadContent();
@@ -29,10 +32,24 @@ public class AnomalyModFixed extends AnomalyModGolden {
          Log.err(var2);
       }
 
+      try {
+         hologramBlock = new HologramBlock("hologram-block");
+      } catch (Throwable var3) {
+         Log.err(var3);
+      }
+
+      try {
+         worldHologramBlock = new WorldHologramBlock("world-hologram-block");
+         decryptorBlock = new DecryptorBlock("decryptor-block");
+      } catch (Throwable var4) {
+         Log.err(var4);
+      }
+
    }
 
    public void init() {
       super.init();
+      Secrets.init();
       fix("anomalies-alloy");
       fix("anomalies-golden-ratio");
    }
