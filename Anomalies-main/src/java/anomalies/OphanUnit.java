@@ -67,7 +67,7 @@ public class OphanUnit extends UnitType {
             this.mirror = true;
             this.alternate = true;
             this.top = false;
-            this.shootSound = Sounds.laser;
+            this.shootSound = Sounds.shoot;
             this.ejectEffect = Fx.none;
             this.bullet = new LaserBulletType() {
                {
