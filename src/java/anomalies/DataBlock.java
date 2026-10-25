@@ -105,7 +105,7 @@ public class DataBlock extends Block {
 
       public void updateTile() {
          Unit u = Vars.headless || Vars.player == null ? null : Vars.player.unit();
-         boolean near = u != null && !u.isNull() && !u.dead() && u.team == this.team && this.target != null && u.within(this, range)
+         boolean near = u != null && u.isValid() && u.team == this.team && this.target != null && u.within(this, range)
             && !(DataSystem.carried == this.target && DataSystem.carrier == u);
          this.dl = near ? Math.min(1.0F, this.dl + Time.delta / dlTime) : Math.max(0.0F, this.dl - Time.delta / (dlTime / 2.0F));
          if (near && this.dl >= 1.0F) {
@@ -118,7 +118,7 @@ public class DataBlock extends Block {
       public void draw() {
          super.draw();
          Unit u = Vars.player == null ? null : Vars.player.unit();
-         if (this.dl > 0.001F && u != null && !u.isNull()) {
+         if (this.dl > 0.001F && u != null && u.isValid()) {
             Draw.z(Layer.effect);
             Draw.blend(Blending.additive);
             Draw.color(col, 0.35F + 0.65F * this.dl);

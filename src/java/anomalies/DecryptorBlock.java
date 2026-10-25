@@ -81,7 +81,7 @@ public class DecryptorBlock extends Block {
          Unit u = Vars.player == null ? null : Vars.player.unit();
          if (!DataSystem.has()) {
             Vars.ui.showInfoToast(Core.bundle.get("anomalies.decrypt.nodata"), 2.0F);
-         } else if (u == null || u.isNull() || !u.within(this, loadRange)) {
+         } else if (u == null || !u.isValid() || !u.within(this, loadRange)) {
             Vars.ui.showInfoToast(Core.bundle.get("anomalies.decrypt.far"), 2.0F);
          } else {
             this.configure(DataSystem.take());

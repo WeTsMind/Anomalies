@@ -61,7 +61,7 @@ public class AnomalyNet {
             mindustry.world.Block var16 = Vars.content.block(var1[1]);
             if (var16 != null) {
                var16.unlock();
-               Vars.state.rules.researched.add(var16.name);
+               Vars.state.rules.researched.add(var16);
                if (Vars.net.server()) {
                   Call.setRules(Vars.state.rules);
                }
