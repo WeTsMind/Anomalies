@@ -10,6 +10,7 @@ import mindustry.world.Block;
 public class AnomalyModFixed extends AnomalyModGolden {
    public static UnitType seraph;
    public static UnitType ophan;
+   public static OphanCore ophanCore;
    public static SeraphCore seraphCore;
    public static Block laserBlock;
    public static Block dataBlock;
@@ -41,6 +42,8 @@ public class AnomalyModFixed extends AnomalyModGolden {
 
       try {
          ophan = new OphanUnit("ophan");
+         ophanCore = new OphanCore("ophan-core");
+         ophanCore.unitType = ophan;
       } catch (Throwable var5) {
          Log.err(var5);
       }

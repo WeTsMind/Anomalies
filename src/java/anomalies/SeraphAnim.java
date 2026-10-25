@@ -35,6 +35,9 @@ public class SeraphAnim {
                if (var0.closestCore() instanceof SeraphCore.SeraphBuild) {
                   ((SeraphCore.SeraphBuild)var0.closestCore()).openStart = var2;
                }
+               if (var0.closestCore() instanceof OphanCore.OphanBuild) {
+                  ((OphanCore.OphanBuild)var0.closestCore()).openStart = var2;
+               }
             }
          } catch (Throwable var3) {
          }
