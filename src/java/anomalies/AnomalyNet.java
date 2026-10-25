@@ -57,6 +57,15 @@ public class AnomalyNet {
             }
 
             last = var6;
+         } else if (var1[0].equals("unlock")) {
+            mindustry.world.Block var16 = Vars.content.block(var1[1]);
+            if (var16 != null) {
+               var16.unlock();
+               Vars.state.rules.researched.add(var16.name);
+               if (Vars.net.server()) {
+                  Call.setRules(Vars.state.rules);
+               }
+            }
          } else if (var1[0].equals("del")) {
             float var12 = (float)Integer.parseInt(var1[1]) * 8.0F;
             float var13 = (float)Integer.parseInt(var1[2]) * 8.0F;
