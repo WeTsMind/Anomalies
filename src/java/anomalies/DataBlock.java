@@ -54,8 +54,12 @@ public class DataBlock extends Block {
       this.health = 200;
       this.requirements(Category.effect, BuildVisibility.shown, ItemStack.with(new Object[]{Items.silicon, 20, Items.lead, 30}));
       this.config(Block.class, (DataBuild b, Block t) -> {
-         if (DataBlock.inGameEdit()) b.target = t; // only the map editor may set it
+         if (DataBlock.inGameEdit()) {
+            b.target = t; // only the map editor may set it
+            b.used = false;
+         }
       });
+      this.config(Boolean.class, (DataBuild b, Boolean v) -> b.used = v);
       this.buildType = () -> new DataBuild();
    }
 
@@ -79,6 +83,13 @@ public class DataBlock extends Block {
       public Block target;
       /** 0..1 download progress of the local player. */
       float dl;
+      /** The data was already taken: the block is deactivated for good. */
+      public boolean used;
+
+      /** On a campaign sector the data cannot be downloaded until the sector is captured. */
+      boolean sectorLocked() {
+         return Vars.state.isCampaign() && Vars.state.rules.sector != null && !Vars.state.rules.sector.isCaptured();
+      }
 
       public Block config() {
          return this.target;
@@ -105,12 +116,13 @@ public class DataBlock extends Block {
 
       public void updateTile() {
          Unit u = Vars.headless || Vars.player == null ? null : Vars.player.unit();
-         boolean near = u != null && u.isValid() && u.team == this.team && this.target != null && u.within(this, range)
+         boolean near = u != null && u.isValid() && u.team == this.team && this.target != null && !this.used && !sectorLocked() && u.within(this, range)
             && !(DataSystem.carried == this.target && DataSystem.carrier == u);
          this.dl = near ? Math.min(1.0F, this.dl + Time.delta / dlTime) : Math.max(0.0F, this.dl - Time.delta / (dlTime / 2.0F));
          if (near && this.dl >= 1.0F) {
             DataSystem.give(this.target, u);
             this.dl = 0.0F;
+            this.configure(Boolean.TRUE);
             if (Vars.ui != null) Vars.ui.showInfoToast(Core.bundle.format("anomalies.data.got", this.target.localizedName), 2.5F);
          }
       }
@@ -144,12 +156,18 @@ public class DataBlock extends Block {
       public void write(Writes write) {
          super.write(write);
          write.str(this.target == null ? "" : this.target.name);
+         write.bool(this.used);
+      }
+
+      public byte version() {
+         return 1;
       }
 
       public void read(Reads read, byte revision) {
          super.read(read, revision);
          String n = read.str();
          this.target = n.isEmpty() ? null : Vars.content.block(n);
+         if (revision >= 1) this.used = read.bool();
       }
    }
 }

@@ -42,7 +42,7 @@ public class SeraphUnit extends UnitType {
    static final Color TRAIL_GOLD = Color.valueOf("ff9400");
    static final Color HEAD_RED = Color.valueOf("ff9967");
    static final Color HEAD_GOLD = Color.valueOf("ffb857");
-   static final Color ENGINE = Color.valueOf("ff5a2a");
+   static final Color ENGINE = Color.valueOf("ffd633");
    static final Color[] GLOW = new Color[]{NEON_RED, NEON_RED, NEON_GOLD, NEON_GOLD};
    static final Color[] TRAIL = new Color[]{TRAIL_RED, TRAIL_RED, TRAIL_GOLD, TRAIL_GOLD};
    static final Color[] HEAD = new Color[]{HEAD_RED, HEAD_RED, HEAD_GOLD, HEAD_GOLD};
@@ -100,21 +100,16 @@ public class SeraphUnit extends UnitType {
       });
    }
 
-   /** Brighter, more saturated version of a team colour (the cell colour). */
+   /** The cell colour: the plain team colour, same as the team details of the Ophan. */
    static Color vivid(mindustry.game.Team t) {
-      Color v = Tmp.c2.set(t.color);
-      v.saturation(Math.min(1.0F, v.saturation() * 1.4F + 0.25F));
-      v.value(1.0F);
-      return v;
+      return Tmp.c2.set(t.color);
    }
 
-   /** The cell next to the Seraph glows in a more saturated, brighter version of the team colour. */
+   /** The cell next to the Seraph is tinted with the plain team colour (dimmer and pulsing when damaged). */
    @Override
    public Color cellColor(Unit unit) {
       float f = Mathf.clamp(unit.healthf());
       Color vivid = Tmp.c2.set(unit.team.color);
-      vivid.saturation(Math.min(1.0F, vivid.saturation() * 1.4F + 0.25F));
-      vivid.value(1.0F);
       float k = Mathf.clamp(0.3F + 0.7F * (f + Mathf.absin(Time.time, Math.max(f * 5.0F, 1.0F), 1.0F - f)));
       return Tmp.c1.set(Color.black).lerp(vivid, k);
    }
@@ -174,6 +169,16 @@ public class SeraphUnit extends UnitType {
 
          }
       }
+   }
+
+   /** no shadow and no dark soft blob under the unit */
+   public void drawShadow(Unit unit) {
+   }
+
+   public void drawSoftShadow(Unit unit) {
+   }
+
+   public void drawSoftShadow(float x, float y, float rotation, float alpha) {
    }
 
    public void draw(Unit var1) {
@@ -292,8 +297,11 @@ public class SeraphUnit extends UnitType {
          float var4 = var1.elevation > 0.5F ? (this.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit) : this.groundLayer;
          Draw.z(var4 - 0.035F);
          Draw.blend(Blending.additive);
+         float var8 = SeraphAnim.wings(SeraphAnim.age(var1));
 
          for(int var7 = 0; var7 < 4; ++var7) {
+            wingPoint(var1, var7, TIPS[var7][0], TIPS[var7][1], var8, tmp);
+            var3[var7].live(tmp[0], tmp[1]);
             var3[var7].draw(TRAIL[var7], HEAD[var7], TRAIL_HALF, var2);
             var3[var7].draw(HEAD[var7], NEON_GOLD, TRAIL_HALF * 0.5F, var2); // bright thin core
          }
@@ -307,6 +315,9 @@ public class SeraphUnit extends UnitType {
    static class WingTrail {
       final float[] pts;
       int n;
+      /** current (this frame) position of the wing end: the ribbon always starts exactly on the wing */
+      float liveX, liveY;
+      boolean live;
 
       WingTrail(int len) {
          pts = new float[len * 2];
@@ -314,6 +325,21 @@ public class SeraphUnit extends UnitType {
 
       void clear() {
          n = 0;
+         live = false;
+      }
+
+      void live(float x, float y) {
+         liveX = x;
+         liveY = y;
+         live = true;
+      }
+
+      float gx(int i) {
+         return i < n ? pts[i * 2] : liveX;
+      }
+
+      float gy(int i) {
+         return i < n ? pts[i * 2 + 1] : liveY;
       }
 
       int size() {
@@ -336,22 +362,23 @@ public class SeraphUnit extends UnitType {
       }
 
       void draw(Color tail, Color head, float half, float alpha) {
-         if (n < 2) return;
+         int m = n + (live && n > 0 ? 1 : 0);
+         if (m < 2) return;
          float px = 0.0F, py = 1.0F; // last valid normal
          float lx = 0.0F, ly = 0.0F, lc = 0.0F; // previous left/right/colour
          float rx = 0.0F, ry = 0.0F;
-         for(int i = 0; i < n; ++i) {
-            int a = Math.max(i - 1, 0), b = Math.min(i + 1, n - 1);
-            float dx = pts[b * 2] - pts[a * 2], dy = pts[b * 2 + 1] - pts[a * 2 + 1];
+         for(int i = 0; i < m; ++i) {
+            int a = Math.max(i - 1, 0), b = Math.min(i + 1, m - 1);
+            float dx = gx(b) - gx(a), dy = gy(b) - gy(a);
             float len = (float)Math.sqrt(dx * dx + dy * dy);
             if (len > 1.0E-4F) {
                px = -dy / len;
                py = dx / len;
             }
-            float t = i / (float)(n - 1); // 0 = tail, 1 = wing tip
+            float t = i / (float)(m - 1); // 0 = tail, 1 = wing tip
             float w = half * t;
             float c = Tmp.c1.set(tail).lerp(head, t).a(alpha * t * t).toFloatBits();
-            float x = pts[i * 2], y = pts[i * 2 + 1];
+            float x = gx(i), y = gy(i);
             float ax = x + px * w, ay = y + py * w, bx = x - px * w, by = y - py * w;
             if (i > 0) {
                Fill.quad(lx, ly, lc, rx, ry, lc, bx, by, c, ax, ay, c);

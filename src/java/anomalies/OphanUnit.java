@@ -9,31 +9,32 @@ import arc.math.Mathf;
 import java.util.Map;
 import java.util.WeakHashMap;
 import mindustry.Vars;
-import mindustry.content.Fx;
-import mindustry.entities.bullet.LaserBulletType;
+import mindustry.entities.bullet.BulletType;
 import mindustry.game.Team;
-import mindustry.gen.Sounds;
 import mindustry.gen.Unit;
 import mindustry.gen.UnitEntity;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 import mindustry.type.UnitType;
-import mindustry.type.Weapon;
+import mindustry.type.weapons.RepairBeamWeapon;
 import mindustry.world.blocks.storage.CoreBlock;
 
 /**
  * Winged flyer. Sprite layers (256x256 canvas, unit centre = canvas centre, 4 px = 1 world unit):
  * two wings (team colour, folded back when spawned from the core, then spread), dark body, front piece, team-colour details.
- * Each wing end leaves a thin glowing ribbon trail. Shoots the healing laser of the Emanate.
+ * Each wing end leaves a thin glowing ribbon trail. Builder and miner with the Emanate repair beam.
  */
 public class OphanUnit extends UnitType {
    /** wing roots in sprite pixels (y down) and fold side (+1 left, -1 right) */
    static final float[][] ROOTS = new float[][]{{108.0F, 90.0F, 1.0F}, {148.0F, 90.0F, -1.0F}};
-   /** wing ends in sprite pixels (y down): lowest point of each wing */
-   static final float[][] TIPS = new float[][]{{95.0F, 162.0F}, {161.0F, 162.0F}};
+   /** wing ends in sprite pixels (y down): rear end of left/right wing, then front end of left/right wing (wing index = i & 1) */
+   static final float[][] TIPS = new float[][]{{95.0F, 162.0F}, {161.0F, 162.0F}, {108.0F, 90.0F}, {148.0F, 90.0F}};
    static final float FOLD = 30.0F;
    static final int TRAIL_LEN = 34;
    static final float TRAIL_HALF = 0.3F;
+   /** the small trail of the engine flame */
+   static final int ENGINE_TRAIL_LEN = 16;
+   static final float ENGINE_TRAIL_HALF = 0.6F;
    static final Map<Unit, SeraphUnit.WingTrail[]> trails = new WeakHashMap();
    static final float[] tmp = new float[2];
    static final Color tail = new Color(), head = new Color(), core = new Color();
@@ -56,29 +57,28 @@ public class OphanUnit extends UnitType {
       this.faceTarget = false;
       this.outlines = false;
       this.drawCell = false;
-      this.engineOffset = 5.5F;
-      this.engineSize = 1.6F;
-      // the Emanate laser: healing beam with short side beams
-      this.weapons.add(new Weapon() {
+      this.engineOffset = 3.0F; // flame comes out from behind the sprite
+      this.engineSize = 1.8F;
+      // builder / miner like the Emanate
+      this.buildSpeed = 3.0F;
+      this.mineTier = 3;
+      this.mineSpeed = 3.0F;
+      this.mineWalls = true;
+      // the Emanate repair beam: heals blocks and units
+      this.weapons.add(new RepairBeamWeapon("") {
          {
             this.x = 5.0F;
-            this.y = 8.0F;
-            this.reload = 50.0F;
-            this.mirror = true;
-            this.alternate = true;
-            this.top = false;
-            this.shootSound = Sounds.shoot;
-            this.ejectEffect = Fx.none;
-            this.bullet = new LaserBulletType() {
+            this.y = 4.0F;
+            this.shootY = 6.0F;
+            this.beamWidth = 0.8F;
+            this.repairSpeed = 0.5F;
+            this.fractionRepairSpeed = 0.045F;
+            this.aiControllable = true;
+            this.controllable = false;
+            this.autoTarget = true;
+            this.bullet = new BulletType() {
                {
-                  this.damage = 60.0F;
-                  this.length = 170.0F;
-                  this.sideAngle = 45.0F;
-                  this.sideWidth = 1.0F;
-                  this.sideLength = 70.0F;
-                  this.healPercent = 12.0F;
-                  this.collidesTeam = true;
-                  this.colors = new Color[]{Pal.heal.cpy().a(0.4F), Pal.heal, Color.white};
+                  this.maxRange = 120.0F;
                }
             };
          }
@@ -114,24 +114,33 @@ public class OphanUnit extends UnitType {
       if (Vars.headless) return;
       SeraphUnit.WingTrail[] t = trails.get(unit);
       if (t == null) {
-         t = new SeraphUnit.WingTrail[TIPS.length];
-         for (int i = 0; i < t.length; ++i) t[i] = new SeraphUnit.WingTrail(TRAIL_LEN);
+         t = new SeraphUnit.WingTrail[TIPS.length + 1];
+         for (int i = 0; i < t.length; ++i) t[i] = new SeraphUnit.WingTrail(i < TIPS.length ? TRAIL_LEN : ENGINE_TRAIL_LEN);
          trails.put(unit, t);
       }
       if (age < SeraphAnim.OPEN_END) {
          for (SeraphUnit.WingTrail w : t) w.clear();
       } else {
          float p = SeraphAnim.wings(age);
-         for (int i = 0; i < t.length; ++i) {
-            wingPoint(unit.x, unit.y, unit.rotation - 90.0F, i, TIPS[i][0], TIPS[i][1], p, tmp);
+         for (int i = 0; i < TIPS.length; ++i) {
+            wingPoint(unit.x, unit.y, unit.rotation - 90.0F, i & 1, TIPS[i][0], TIPS[i][1], p, tmp);
             t[i].add(tmp[0], tmp[1]);
          }
+         enginePoint(unit, tmp);
+         t[TIPS.length].add(tmp[0], tmp[1]);
       }
    }
 
    /** no shadow under the unit */
    @Override
    public void drawShadow(Unit unit) {
+   }
+
+   /** no dark soft blob under the unit either */
+   public void drawSoftShadow(Unit unit) {
+   }
+
+   public void drawSoftShadow(float x, float y, float rotation, float alpha) {
    }
 
    public void draw(Unit unit) {
@@ -181,17 +190,35 @@ public class OphanUnit extends UnitType {
    void drawTrails(Unit unit, float z) {
       SeraphUnit.WingTrail[] t = trails.get(unit);
       if (t == null) return;
+      float p = SeraphAnim.wings(SeraphAnim.age(unit));
+      for (int i = 0; i < TIPS.length; ++i) {
+         wingPoint(unit.x, unit.y, unit.rotation - 90.0F, i & 1, TIPS[i][0], TIPS[i][1], p, tmp);
+         t[i].live(tmp[0], tmp[1]);
+      }
+      enginePoint(unit, tmp);
+      t[TIPS.length].live(tmp[0], tmp[1]);
       tail.set(unit.team.color);
       head.set(unit.team.color).lerp(Color.white, 0.45F);
       core.set(head).lerp(Color.white, 0.6F);
       Draw.z(z - 0.035F);
       Draw.blend(Blending.additive);
-      for (SeraphUnit.WingTrail w : t) {
-         w.draw(tail, head, TRAIL_HALF, 1.0F);
-         w.draw(head, core, TRAIL_HALF * 0.5F, 1.0F);
+      for (int i = 0; i < TIPS.length; ++i) {
+         t[i].draw(tail, head, TRAIL_HALF, 1.0F);
+         t[i].draw(head, core, TRAIL_HALF * 0.5F, 1.0F);
       }
+      // engine flame trail
+      tail.set(Pal.engine);
+      head.set(Pal.engine).lerp(Color.white, 0.4F);
+      t[TIPS.length].draw(tail, head, ENGINE_TRAIL_HALF, 1.0F);
       Draw.blend();
       Draw.reset();
+   }
+
+   /** World position of the engine flame centre. */
+   void enginePoint(Unit unit, float[] out) {
+      float rot = unit.rotation - 90.0F;
+      out[0] = unit.x + Mathf.sinDeg(rot) * this.engineOffset;
+      out[1] = unit.y - Mathf.cosDeg(rot) * this.engineOffset;
    }
 
    /** World position of a sprite pixel (256x256, y down) of a wing that is folded by (1 - p) around its root. */
