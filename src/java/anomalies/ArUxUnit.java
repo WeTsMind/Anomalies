@@ -20,7 +20,10 @@ import mindustry.gen.Unit;
 import mindustry.graphics.Layer;
 import mindustry.type.UnitType;
 import mindustry.type.Weapon;
+import arc.audio.Sound;
+import mindustry.world.Block;
 import mindustry.world.blocks.defense.turrets.ContinuousTurret;
+import mindustry.world.blocks.defense.turrets.Turret;
 
 /**
  * Arux: upgrade of Alloy in the Multiplicative Reconstructor. Six legs (three per side), every leg is made of three sprites:
@@ -104,7 +107,7 @@ public class ArUxUnit extends UnitType {
       laser.continuous = true;
       laser.reload = 260.0F;
       laser.recoil = 0.0F;
-      laser.shootSound = Sounds.laser;
+      laser.shootSound = soundOf(Blocks.sublimate, Sounds.shoot);
       laser.bullet = flame;
       this.weapons.add(laser);
 
@@ -139,9 +142,21 @@ public class ArUxUnit extends UnitType {
       shocker.reload = 34.0F;
       shocker.recoil = 5.0F;
       shocker.recoilTime = 12.0F;
-      shocker.shootSound = Sounds.spark;
+      shocker.shootSound = soundOf(Blocks.arc, Sounds.shoot);
       shocker.bullet = bolt;
       this.weapons.add(shocker);
+   }
+
+   /** Shoot sound of a vanilla turret (falls back to the given sound). */
+   static Sound soundOf(Block turret, Sound fallback) {
+      try {
+         if (turret instanceof Turret) {
+            Sound snd = ((Turret)turret).shootSound;
+            if (snd != null) return snd;
+         }
+      } catch (Throwable ignored) {
+      }
+      return fallback;
    }
 
    public void load() {
