@@ -10,10 +10,7 @@ import arc.math.Mathf;
 import mindustry.content.Blocks;
 import mindustry.content.Fx;
 import mindustry.entities.Leg;
-import mindustry.entities.bullet.BulletType;
-import mindustry.entities.bullet.ContinuousBulletType;
 import mindustry.entities.bullet.ContinuousFlameBulletType;
-import mindustry.entities.bullet.LightningBulletType;
 import mindustry.entities.units.WeaponMount;
 import mindustry.gen.LegsUnit;
 import mindustry.gen.Legsc;
@@ -23,7 +20,6 @@ import mindustry.graphics.Layer;
 import mindustry.type.UnitType;
 import mindustry.type.Weapon;
 import mindustry.world.Block;
-import mindustry.world.blocks.defense.turrets.ContinuousTurret;
 import mindustry.world.blocks.defense.turrets.Turret;
 
 /**
@@ -32,7 +28,7 @@ import mindustry.world.blocks.defense.turrets.Turret;
  * - the yellow laser (the Sublimate flame in yellow) comes out of the slit in the middle of the hull,
  * - the cannon sits in the slit and turns towards the target, it fires the regular ball lightning,
  *   its white rear part is painted in the team colour and turns together with the cannon,
- * - two shockers under the hull: short yellow lightning (3 tiles), they jerk back a little after every shot,
+ * - two shockers under the hull: a short yellow lightning strike like the ball lightning one (3 tiles), they jerk back a little after every shot,
  * - six legs (three per side), every leg is three sprites lying on top of each other:
  *   foot (bottom), knee part over the foot, upper part over the knee part, the hull over everything.
  */
@@ -77,32 +73,20 @@ public class ArUxUnit extends UnitType {
       this.legMinLength = 0.2F;
       this.legLengthScl = 0.96F;
 
-      // 1) the laser: the very same flame as the Sublimate turret, recoloured to yellow
-      BulletType flame = null;
-      try {
-         if (Blocks.sublimate instanceof ContinuousTurret) {
-            BulletType b = ((ContinuousTurret)Blocks.sublimate).shootType;
-            if (b != null) flame = b.copy();
-         }
-      } catch (Throwable ignored) {
-      }
-      if (flame == null) {
-         ContinuousFlameBulletType f = new ContinuousFlameBulletType();
-         f.damage = 78.0F;
-         f.length = 125.0F;
-         f.knockback = 1.0F;
-         f.pierceCap = 2;
-         f.buildingDamageMultiplier = 0.3F;
-         flame = f;
-      }
-      if (flame instanceof ContinuousFlameBulletType) {
-         ((ContinuousFlameBulletType)flame).colors = new Color[]{
-            Color.valueOf("ff9e2f").a(0.55F), Color.valueOf("ffc83a").a(0.7F), Color.valueOf("ffe14a").a(0.8F), Color.valueOf("fff2a8"), Color.white};
-      }
+      // 1) the laser: the Sublimate flame (same bullet type and values), yellow. It must be a fresh bullet (not a copy of the
+      // turret's one): a copy is never loaded by the game and draws the "Oh no" missing texture.
+      ContinuousFlameBulletType flame = new ContinuousFlameBulletType();
+      flame.damage = 78.0F;
+      flame.length = 125.0F;
+      flame.knockback = 1.0F;
+      flame.pierceCap = 2;
+      flame.buildingDamageMultiplier = 0.3F;
+      flame.colors = new Color[]{
+         Color.valueOf("ff9e2f").a(0.55F), Color.valueOf("ffc83a").a(0.7F), Color.valueOf("ffe14a").a(0.8F), Color.valueOf("fff2a8"), Color.white};
       flame.lightColor = yellow;
       flame.hitColor = yellow;
       flame.lifetime = 120.0F; // one burst of the laser, then it reloads
-      float laserLen = flame instanceof ContinuousBulletType ? ((ContinuousBulletType)flame).length : 125.0F;
+      float laserLen = flame.length;
       this.range = laserLen;
       this.maxRange = laserLen;
       Weapon laser = new Weapon();
@@ -154,11 +138,6 @@ public class ArUxUnit extends UnitType {
       this.weapons.add(cannon);
 
       // 3) shockers under the hull: short yellow lightning (3 tiles), a small jerk back after the shot
-      LightningBulletType bolt = new LightningBulletType();
-      bolt.damage = 22.0F;
-      bolt.lightningLength = 4;
-      bolt.lightningColor = yellow;
-      bolt.rangeOverride = 24.0F;
       Weapon shocker = new Weapon("anomalies-arux-shocker");
       shocker.x = 5.5F;
       shocker.y = 5.25F;
@@ -172,7 +151,7 @@ public class ArUxUnit extends UnitType {
       shocker.recoil = 1.5F; // small jerk back, they stay visible
       shocker.recoilTime = 10.0F;
       shocker.shootSound = soundOf(Blocks.arc, Sounds.shoot);
-      shocker.bullet = bolt;
+      shocker.bullet = new ShockBolt(22.0F);
       this.weapons.add(shocker);
    }
 
@@ -229,16 +208,20 @@ public class ArUxUnit extends UnitType {
             float hy = unit.y + Angles.trnsy(toFoot, this.legBaseOffset);
             // +1 for legs on the right side of the unit, -1 on the left (the sprites are mirrored)
             float side = ((fx - unit.x) * sr - (fy - unit.y) * cr) >= 0.0F ? 1.0F : -1.0F;
+            float a1 = Angles.angle(hx, hy, jx, jy); // upper part: hip -> knee
+            float a2 = Angles.angle(jx, jy, fx, fy); // knee part and foot: knee -> foot
             if (pass == 0) {
-               float a = Angles.angle(jx, jy, fx, fy);
-               float half = foot.width * Draw.scl * 0.5F - 1.0F; // the toe of the foot sits on the ground point
-               piece(foot, fx - Angles.trnsx(a, half), fy - Angles.trnsy(a, half), a, side);
+               // the toe sits on the ground point, the inner end is hidden under the knee part
+               float half = foot.width * Draw.scl * 0.5F - 1.0F;
+               piece(foot, fx - Angles.trnsx(a2, half), fy - Angles.trnsy(a2, half), a2, side);
             } else if (pass == 1) {
-               piece(mid, jx, jy, Angles.angle(hx, hy, fx, fy), side);
+               // starts a little before the knee and lies on the foot
+               float half = mid.width * Draw.scl * 0.5F - 0.75F;
+               piece(mid, jx + Angles.trnsx(a2, half), jy + Angles.trnsy(a2, half), a2, side);
             } else {
-               float a = Angles.angle(hx, hy, jx, jy);
-               float half = upper.width * Draw.scl * 0.5F; // the inner end of the upper part sits at the hull
-               piece(upper, hx + Angles.trnsx(a, half), hy + Angles.trnsy(a, half), a, side);
+               // its outer end reaches a little over the knee and lies on the knee part, the inner end is under the hull
+               float half = upper.width * Draw.scl * 0.5F - 0.75F;
+               piece(upper, jx - Angles.trnsx(a1, half), jy - Angles.trnsy(a1, half), a1, side);
             }
          }
       }
