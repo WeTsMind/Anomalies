@@ -36,7 +36,7 @@ public class ArUxUnit extends UnitType {
    /** cannon centre, world units from the unit centre (forward = +y) */
    static final float CANNON_Y = -1.75F;
    /** the slit ends at the front edge of the hull: the laser starts there */
-   static final float LASER_Y = 8.0F;
+   static final float LASER_Y = 8.5F;
    static final Color yellow = Color.valueOf("ffd21f");
    /** centre of the leg hub, distance from the hip along the leg */
    static final float HUB_ARC = 3.0F;
@@ -75,17 +75,16 @@ public class ArUxUnit extends UnitType {
       this.legMinLength = 0.2F;
       this.legLengthScl = 0.96F;
 
-      // 1) the laser: the Sublimate flame (same bullet type), yellow, 3 tiles long, 60 damage per second. It must be a fresh bullet (not a copy of the
+      // 1) the laser: the Sublimate flame (same bullet type), yellow, 5 tiles long, 60 damage per second, narrowing to a sharp point. It must be a fresh bullet (not a copy of the
       // turret's one): a copy is never loaded by the game and draws the "Oh no" missing texture.
-      ContinuousFlameBulletType flame = new ContinuousFlameBulletType();
+      ArUxLaser flame = new ArUxLaser();
       flame.damage = 5.0F; // hits every 5 ticks: 12 hits per second = 60 damage per second
-      flame.length = 24.0F; // 3 tiles
+      flame.length = 40.0F; // 5 tiles
       flame.knockback = 1.0F;
       flame.pierceCap = 2;
       flame.buildingDamageMultiplier = 1.0F;
       flame.colors = new Color[]{
          Color.valueOf("ff9e2f").a(0.55F), Color.valueOf("ffc83a").a(0.7F), Color.valueOf("ffe14a").a(0.8F), Color.valueOf("fff2a8"), Color.white};
-      flame.flareColor = yellow; // the star of the laser
       flame.lightColor = yellow;
       flame.hitColor = yellow;
       flame.lifetime = 120.0F; // kept alive by the weapon while the fire button is held
