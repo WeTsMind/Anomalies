@@ -23,45 +23,72 @@ import java.lang.reflect.Field;
 /**
  * Alloy is an upgrade of Golden Ratio in the regular (vanilla) Additive Reconstructor.
  * Upgrade cost: 20 surge alloy, 120 silicon, 50 titanium, 50 plastanium.
- * All other units keep the vanilla cost of the reconstructor (40 silicon + 40 graphite).
+ * Arux is an upgrade of Alloy in the Multiplicative Reconstructor.
+ * Upgrade cost: 100 surge alloy, 200 silicon, 150 titanium, 35 plastanium.
+ * All other units keep the vanilla cost of their reconstructor.
  */
 public class AlloyUpgrade {
    static final String GOLDEN = "anomalies-golden-ratio";
    static final String ALLOY = "anomalies-alloy";
+   static final String ARUX = "anomalies-arux";
 
-   public static final ItemStack[] VANILLA_COST = ItemStack.with(new Object[]{Items.silicon, 40, Items.graphite, 40});
+   public static ItemStack[] VANILLA_COST = ItemStack.with(new Object[]{Items.silicon, 40, Items.graphite, 40});
+   public static ItemStack[] VANILLA_COST_MULTI = ItemStack.with(new Object[]{Items.silicon, 130, Items.titanium, 80, Items.metaglass, 40});
    public static final ItemStack[] ALLOY_COST = ItemStack.with(new Object[]{Items.surgeAlloy, 20, Items.silicon, 120, Items.titanium, 50, Items.plastanium, 50});
+   public static final ItemStack[] ARUX_COST = ItemStack.with(new Object[]{Items.surgeAlloy, 100, Items.silicon, 200, Items.titanium, 150, Items.plastanium, 35});
 
    /** Runs BEFORE blocks are initialised (from loadContent): swaps the fixed item cost for one that depends on the unit inside. */
-   @SuppressWarnings("unchecked")
    public static void prepare() {
-      if (!(Blocks.additiveReconstructor instanceof Reconstructor)) {
+      swap(Blocks.additiveReconstructor, true);
+      swap(Blocks.multiplicativeReconstructor, false);
+   }
+
+   @SuppressWarnings("unchecked")
+   static void swap(Block block, boolean additive) {
+      if (!(block instanceof Reconstructor)) {
          return;
       }
       try {
-         Block block = Blocks.additiveReconstructor;
          Field field = Block.class.getDeclaredField("consumeBuilder");
          field.setAccessible(true);
          Seq<Consume> list = (Seq<Consume>)field.get(block);
+         ItemStack[] vanilla = null;
+         for (Consume c : list) {
+            if (c instanceof ConsumeItems) {
+               vanilla = ((ConsumeItems)c).items;
+            }
+         }
+         if (vanilla != null) {
+            if (additive) {
+               VANILLA_COST = vanilla;
+            } else {
+               VANILLA_COST_MULTI = vanilla;
+            }
+         }
          list.removeAll(c -> c instanceof ConsumeItems);
-         block.consume(new AdditiveConsume());
+         block.consume(new AdditiveConsume(additive ? VANILLA_COST : VANILLA_COST_MULTI));
       } catch (Throwable t) {
          Log.err(t);
       }
    }
 
-   /** Runs AFTER the JSON content is loaded (from init): registers the upgrade and lets the reconstructor accept the extra items. */
+   /** Runs AFTER the JSON content is loaded (from init): registers the upgrades and lets the reconstructors accept the extra items. */
    public static void register() {
+      add(Blocks.additiveReconstructor, GOLDEN, ALLOY, ALLOY_COST);
+      add(Blocks.multiplicativeReconstructor, ALLOY, ARUX, ARUX_COST);
+   }
+
+   static void add(Block block, String from, String to, ItemStack[] cost) {
       try {
-         if (!(Blocks.additiveReconstructor instanceof Reconstructor)) {
+         if (!(block instanceof Reconstructor)) {
             return;
          }
-         MappableContent g = Vars.content.getByName(ContentType.unit, GOLDEN);
-         MappableContent a = Vars.content.getByName(ContentType.unit, ALLOY);
+         MappableContent g = Vars.content.getByName(ContentType.unit, from);
+         MappableContent a = Vars.content.getByName(ContentType.unit, to);
          if (!(g instanceof UnitType) || !(a instanceof UnitType)) {
             return;
          }
-         Reconstructor rec = (Reconstructor)Blocks.additiveReconstructor;
+         Reconstructor rec = (Reconstructor)block;
          boolean has = false;
          for (UnitType[] pair : rec.upgrades) {
             if (pair[0] == g) {
@@ -71,7 +98,7 @@ public class AlloyUpgrade {
          if (!has) {
             rec.upgrades.add(new UnitType[]{(UnitType)g, (UnitType)a});
          }
-         for (ItemStack stack : ALLOY_COST) {
+         for (ItemStack stack : cost) {
             int id = stack.item.id;
             if (rec.itemFilter != null && id < rec.itemFilter.length) {
                rec.itemFilter[id] = true;
@@ -88,25 +115,31 @@ public class AlloyUpgrade {
 
    /** What the reconstructor needs right now: depends on the unit that sits inside it. */
    static ItemStack[] cost(Building build) {
+      boolean additive = build.block == Blocks.additiveReconstructor;
       try {
          if (build instanceof Reconstructor.ReconstructorBuild) {
             Reconstructor.ReconstructorBuild rb = (Reconstructor.ReconstructorBuild)build;
             if (rb.payload instanceof UnitPayload) {
                UnitType type = ((UnitPayload)rb.payload).unit.type;
-               // the payload is already Alloy at the moment the upgrade finishes and the items are taken
-               if (type != null && (GOLDEN.equals(type.name) || ALLOY.equals(type.name))) {
-                  return ALLOY_COST;
+               // the payload is already the upgraded unit at the moment the upgrade finishes and the items are taken
+               if (type != null) {
+                  if (additive && (GOLDEN.equals(type.name) || ALLOY.equals(type.name))) {
+                     return ALLOY_COST;
+                  }
+                  if (build.block == Blocks.multiplicativeReconstructor && (ALLOY.equals(type.name) || ARUX.equals(type.name))) {
+                     return ARUX_COST;
+                  }
                }
             }
          }
       } catch (Throwable ignored) {
       }
-      return VANILLA_COST;
+      return additive ? VANILLA_COST : VANILLA_COST_MULTI;
    }
 
    static class AdditiveConsume extends ConsumeItems {
-      AdditiveConsume() {
-         super(VANILLA_COST);
+      AdditiveConsume(ItemStack[] vanilla) {
+         super(vanilla);
       }
 
       @Override

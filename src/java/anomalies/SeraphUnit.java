@@ -84,20 +84,6 @@ public class SeraphUnit extends UnitType {
       this.trailLength = 14;
       this.trailScl = 0.5F;
       this.outlines = false;
-      // the purple laser: one pulse every 6 ticks while fire is held, see SeraphBeam
-      this.weapons.add(new Weapon() {
-         {
-            this.reload = 6.0F;
-            this.x = 0.0F;
-            this.y = 8.0F;
-            this.mirror = false;
-            this.top = false;
-            this.rotate = true;
-            this.shootSound = Sounds.none;
-            this.ejectEffect = Fx.none;
-            this.bullet = new SeraphBeam();
-         }
-      });
    }
 
    /** The cell colour: the plain team colour, same as the team details of the Ophan. */
@@ -249,46 +235,10 @@ public class SeraphUnit extends UnitType {
       var5[1] = var0.y + var16 * var8 + var17 * var7;
    }
 
-   /** The mining beam is a glowing purple laser (same palette as the Laser Block) instead of the default grey one. */
+   /** The mining beam: yellow laser with a white core, see MineBeam. */
    @Override
    public void drawMiningBeam(Unit unit, float px, float py) {
-      if (!unit.mining()) return;
-      float ex = unit.mineTile.worldx() + Mathf.sin(Time.time + 48.0F, 12.0F, 1.0F);
-      float ey = unit.mineTile.worldy() + Mathf.sin(Time.time + 48.0F, 14.0F, 1.0F);
-      float a = Renderer.unitLaserOpacity;
-      float pulse = 0.85F + 0.15F * Mathf.sin(Time.time / 4.0F);
-
-      Draw.z(Layer.flyingUnit + 0.1F);
-      Draw.blend(Blending.additive);
-      Lines.stroke(6.0F * pulse);
-      Draw.color(LaserBlock.col, 0.14F * a);
-      Lines.line(px, py, ex, ey);
-      Lines.stroke(3.4F * pulse);
-      Draw.color(LaserBlock.col, 0.35F * a);
-      Lines.line(px, py, ex, ey);
-      Lines.stroke(1.4F);
-      Draw.color(LaserBlock.hot, 0.95F * a);
-      Lines.line(px, py, ex, ey);
-
-      // glow at both ends and sparks where the beam burns the ore
-      Fill.light(ex, ey, 18, 8.0F * pulse, Tmp.c1.set(LaserBlock.col).a(0.6F * a), Tmp.c2.set(LaserBlock.col).a(0.0F));
-      Fill.light(px, py, 14, 5.0F * pulse, Tmp.c1.set(LaserBlock.col).a(0.5F * a), Tmp.c2.set(LaserBlock.col).a(0.0F));
-      Mathf.randomSeed((long)unit.id * 7L + (long)(Time.time / 3.0F));
-      Lines.stroke(1.0F);
-      Draw.color(LaserBlock.hot, 0.9F * a);
-      for(int i = 0; i < 4; ++i) {
-         Lines.lineAngle(ex, ey, Mathf.random(360.0F), Mathf.random(1.5F, 5.5F));
-      }
-
-      Draw.blend();
-      Drawf.light(px, py, ex, ey, 26.0F, LaserBlock.col, 0.5F * a);
-
-      if (unit.isLocal()) {
-         Lines.stroke(1.0F, Pal.accent);
-         Lines.poly(unit.mineTile.worldx(), unit.mineTile.worldy(), 4, 4.0F * Mathf.sqrt2, Time.time);
-      }
-
-      Draw.reset();
+      MineBeam.draw(unit, px, py);
    }
 
    void drawTrails(Unit var1, float var2) {

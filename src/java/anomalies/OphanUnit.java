@@ -9,20 +9,18 @@ import arc.math.Mathf;
 import java.util.Map;
 import java.util.WeakHashMap;
 import mindustry.Vars;
-import mindustry.entities.bullet.BulletType;
 import mindustry.game.Team;
 import mindustry.gen.Unit;
 import mindustry.gen.UnitEntity;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 import mindustry.type.UnitType;
-import mindustry.type.weapons.RepairBeamWeapon;
 import mindustry.world.blocks.storage.CoreBlock;
 
 /**
  * Winged flyer. Sprite layers (256x256 canvas, unit centre = canvas centre, 4 px = 1 world unit):
  * two wings (team colour, folded back when spawned from the core, then spread), dark body, front piece, team-colour details.
- * Each wing end leaves a thin glowing ribbon trail. Builder and miner with the Emanate repair beam.
+ * Each wing end leaves a thin glowing ribbon trail. Builder and miner (standard build / mining beams, no repair beam).
  */
 public class OphanUnit extends UnitType {
    /** wing roots in sprite pixels (y down) and fold side (+1 left, -1 right) */
@@ -64,25 +62,12 @@ public class OphanUnit extends UnitType {
       this.mineTier = 3;
       this.mineSpeed = 3.0F;
       this.mineWalls = true;
-      // the Emanate repair beam: heals blocks and units
-      this.weapons.add(new RepairBeamWeapon("") {
-         {
-            this.x = 5.0F;
-            this.y = 4.0F;
-            this.shootY = 6.0F;
-            this.beamWidth = 0.8F;
-            this.repairSpeed = 0.5F;
-            this.fractionRepairSpeed = 0.045F;
-            this.aiControllable = true;
-            this.controllable = false;
-            this.autoTarget = true;
-            this.bullet = new BulletType() {
-               {
-                  this.maxRange = 120.0F;
-               }
-            };
-         }
-      });
+   }
+
+   /** The mining beam: yellow laser with a white core, see MineBeam. */
+   @Override
+   public void drawMiningBeam(Unit unit, float px, float py) {
+      MineBeam.draw(unit, px, py);
    }
 
    public void load() {

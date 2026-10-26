@@ -91,9 +91,14 @@ public class DecryptorBlock extends Block {
       void tryTake() {
          if (this.loaded == null || this.progress < 1.0F) return;
          Block b = this.loaded;
-         AnomalyNet.send("unlock|" + b.name);
-         b.unlock();
-         Vars.ui.showInfoToast(Core.bundle.format("anomalies.data.unlocked", b.localizedName), 3.0F);
+         if (Vars.state.isCampaign()) {
+            AnomalyNet.send("unlock|" + b.name);
+            b.unlock();
+            Vars.ui.showInfoToast(Core.bundle.format("anomalies.data.unlocked", b.localizedName), 3.0F);
+         } else {
+            // custom map: do not add new recipes to the tech tree
+            Vars.ui.showInfoToast(Core.bundle.get("anomalies.decrypt.custom"), 3.0F);
+         }
          this.configure(0);
       }
 

@@ -10,6 +10,7 @@ import mindustry.world.Block;
 public class AnomalyModFixed extends AnomalyModGolden {
    public static UnitType seraph;
    public static UnitType ophan;
+   public static UnitType arux;
    public static OphanCore ophanCore;
    public static SeraphCore seraphCore;
    public static Block laserBlock;
@@ -48,6 +49,12 @@ public class AnomalyModFixed extends AnomalyModGolden {
          Log.err(var5);
       }
 
+      try {
+         arux = new ArUxUnit("arux");
+      } catch (Throwable var6) {
+         Log.err(var6);
+      }
+
    }
 
    public void init() {
@@ -55,6 +62,7 @@ public class AnomalyModFixed extends AnomalyModGolden {
       DataSystem.init();
       fix("anomalies-alloy");
       fix("anomalies-golden-ratio");
+      fix("anomalies-arux");
    }
 
    static void fix(String var0) {

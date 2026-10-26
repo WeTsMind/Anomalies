@@ -58,6 +58,9 @@ public class AnomalyNet {
 
             last = var6;
          } else if (var1[0].equals("unlock")) {
+            if (!Vars.state.isCampaign()) {
+               return;
+            }
             mindustry.world.Block var16 = Vars.content.block(var1[1]);
             if (var16 != null) {
                var16.unlock();
