@@ -12,10 +12,12 @@ import mindustry.gen.Unit;
 import mindustry.graphics.Layer;
 import mindustry.world.Block;
 
-/** The data the local player's unit carries from a Data Block to a Decryptor. Lost when the unit dies. */
+/** The data the local player's unit carries from a Data Block to a Decryptor. Lost when the unit dies: the data then returns to its Data Block. */
 public class DataSystem {
    public static Block carried;
    public static Unit carrier;
+   /** the Data Block the carried data came from */
+   static DataBlock.DataBuild source;
    static TextureRegion icon;
 
    public static void init() {
@@ -26,11 +28,20 @@ public class DataSystem {
    public static void clear() {
       carried = null;
       carrier = null;
+      source = null;
    }
 
-   public static void give(Block b, Unit u) {
+   public static void give(Block b, Unit u, DataBlock.DataBuild src) {
       carried = b;
       carrier = u;
+      source = src;
+   }
+
+   /** The carrier lost the data (died, changed unit): the data goes back to its Data Block so it can be taken again. */
+   static void release() {
+      DataBlock.DataBuild src = source;
+      clear();
+      if (src != null && src.isValid() && src.held) src.configure(0);
    }
 
    public static boolean has() {
@@ -41,12 +52,14 @@ public class DataSystem {
    public static Block take() {
       validate();
       Block b = carried;
+      DataBlock.DataBuild src = source;
       clear();
+      if (src != null && src.isValid()) src.configure(2); // delivered: the Data Block is used up for good
       return b;
    }
 
    static void validate() {
-      if (carried != null && (Vars.player == null || carrier == null || carrier.dead() || carrier != Vars.player.unit())) clear();
+      if (carried != null && (Vars.player == null || carrier == null || carrier.dead() || carrier != Vars.player.unit())) release();
    }
 
    static void draw() {

@@ -35,14 +35,12 @@ import mindustry.world.blocks.defense.turrets.Turret;
 public class ArUxUnit extends UnitType {
    /** cannon centre, world units from the unit centre (forward = +y) */
    static final float CANNON_Y = -1.75F;
-   /** the slit ends at the front edge of the hull: the laser starts there */
-   static final float LASER_Y = 8.5F;
+   /** the laser starts at the beginning of the cut in the hull (marked by the user), 17 px above the hull centre (the red dot of the user's picture) */
+   static final float LASER_Y = 4.25F;
    static final Color yellow = Color.valueOf("ffd21f");
    /** centre of the leg hub, distance from the hip along the leg */
    static final float HUB_ARC = 3.0F;
    TextureRegion cannonTeam;
-   /** 0 = hub (at the hull), 1 = middle chevron, 2 = foot arrow */
-   final TextureRegion[] legSprites = new TextureRegion[3];
 
    public ArUxUnit(String name) {
       super(name);
@@ -75,10 +73,10 @@ public class ArUxUnit extends UnitType {
       this.legMinLength = 0.2F;
       this.legLengthScl = 0.96F;
 
-      // 1) the laser: the Sublimate flame (same bullet type), yellow, 5 tiles long, 60 damage per second, narrowing to a sharp point. It must be a fresh bullet (not a copy of the
+      // 1) the laser: the Sublimate flame (same bullet type), yellow, 5 tiles long, 260 damage per second, wide beam with a smooth taper to a point. It must be a fresh bullet (not a copy of the
       // turret's one): a copy is never loaded by the game and draws the "Oh no" missing texture.
       ArUxLaser flame = new ArUxLaser();
-      flame.damage = 5.0F; // hits every 5 ticks: 12 hits per second = 60 damage per second
+      flame.damage = 260.0F / 12.0F; // hits every 5 ticks: 12 hits per second = 260 damage per second
       flame.length = 40.0F; // 5 tiles
       flame.knockback = 1.0F;
       flame.pierceCap = 2;
@@ -154,7 +152,7 @@ public class ArUxUnit extends UnitType {
       shocker.recoil = 1.5F; // small jerk back, they stay visible
       shocker.recoilTime = 10.0F;
       shocker.shootSound = soundOf(Blocks.arc, Sounds.shoot);
-      shocker.bullet = new ShockBolt(22.0F);
+      shocker.bullet = new ShockBolt(122.0F);
       this.weapons.add(shocker);
    }
 
@@ -173,73 +171,14 @@ public class ArUxUnit extends UnitType {
    public void load() {
       super.load();
       this.cannonTeam = Core.atlas.find(this.name + "-cannon-team");
-      this.legSprites[0] = Core.atlas.find(this.name + "-leg-upper");
-      this.legSprites[1] = Core.atlas.find(this.name + "-leg-mid");
-      this.legSprites[2] = Core.atlas.find(this.name + "-leg-foot");
-      // our own leg sprites are drawn in draw(): make the default leg pictures invisible
-      TextureRegion clear = Core.atlas.find("clear");
-      this.legRegion = clear;
-      this.legBaseRegion = clear;
-      this.footRegion = clear;
+      // legs are drawn by the game itself, exactly like Alloy: hip->knee piece, knee->foot piece and the foot
+      this.legRegion = Core.atlas.find(this.name + "-leg-upper");
+      this.legBaseRegion = Core.atlas.find(this.name + "-leg-mid");
+      this.footRegion = Core.atlas.find(this.name + "-leg-foot");
       if (Core.atlas.has(this.name + "-icon")) {
          TextureRegion icon = Core.atlas.find(this.name + "-icon");
          this.fullIcon = icon;
          this.uiIcon = icon;
       }
-   }
-
-   public void draw(Unit unit) {
-      float z = unit.elevation > 0.5F ? (this.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit) : this.groundLayer;
-      drawLegSprites(unit, z);
-      super.draw(unit);
-   }
-
-   /**
-    * Every leg is three sprites lying on top of each other along the leg (hip -> knee -> foot): the hub at the hull, the small
-    * chevron in the middle and the big arrow on the ground (toe exactly on the foot point, so it never lifts off while walking).
-    * Drawing order: arrow at the bottom, the chevron over it, the hub over both (the hull is drawn over all).
-    */
-   void drawLegSprites(Unit unit, float z) {
-      if (!(unit instanceof Legsc)) return;
-      Leg[] legs = ((Legsc)unit).legs();
-      if (legs == null) return;
-      TextureRegion hub = this.legSprites[0], mid = this.legSprites[1], foot = this.legSprites[2];
-      float cr = Mathf.cosDeg(unit.rotation), sr = Mathf.sinDeg(unit.rotation);
-      for (int pass = 0; pass < 3; ++pass) { // 0 = arrows (feet), 1 = chevrons, 2 = hubs
-         Draw.z(z - 0.04F + 0.01F * pass);
-         for (Leg leg : legs) {
-            float fx = leg.base.x, fy = leg.base.y;
-            float jx = leg.joint.x, jy = leg.joint.y;
-            float toFoot = Angles.angle(unit.x, unit.y, fx, fy);
-            float hx = unit.x + Angles.trnsx(toFoot, this.legBaseOffset);
-            float hy = unit.y + Angles.trnsy(toFoot, this.legBaseOffset);
-            // +1 for legs on the right side of the unit, -1 on the left (the sprites are mirrored)
-            float side = ((fx - unit.x) * sr - (fy - unit.y) * cr) >= 0.0F ? 1.0F : -1.0F;
-            float l1 = Mathf.dst(hx, hy, jx, jy), l2 = Mathf.dst(jx, jy, fx, fy);
-            float total = l1 + l2;
-            // centres along the path: hub near the hip, arrow with its toe on the ground, chevron in between
-            float s0 = HUB_ARC;
-            float s2 = Math.max(s0, total + 1.0F - foot.width * Draw.scl * 0.5F);
-            float s1 = (s0 + s2) * 0.5F;
-            float s = pass == 0 ? s2 : (pass == 1 ? s1 : s0);
-            TextureRegion r = pass == 0 ? foot : (pass == 1 ? mid : hub);
-            float px, py, a;
-            if (s <= l1) {
-               a = Angles.angle(hx, hy, jx, jy);
-               px = hx + Angles.trnsx(a, s);
-               py = hy + Angles.trnsy(a, s);
-            } else {
-               a = Angles.angle(jx, jy, fx, fy);
-               px = jx + Angles.trnsx(a, s - l1);
-               py = jy + Angles.trnsy(a, s - l1);
-            }
-            piece(r, px, py, a, side);
-         }
-      }
-      Draw.reset();
-   }
-
-   static void piece(TextureRegion r, float x, float y, float angle, float side) {
-      Draw.rect(r, x, y, r.width * Draw.scl, r.height * Draw.scl * side, angle);
    }
 }

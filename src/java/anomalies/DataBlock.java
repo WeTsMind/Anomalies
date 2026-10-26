@@ -57,9 +57,20 @@ public class DataBlock extends Block {
          if (DataBlock.inGameEdit()) {
             b.target = t; // only the map editor may set it
             b.used = false;
+            b.held = false;
          }
       });
-      this.config(Boolean.class, (DataBuild b, Boolean v) -> b.used = v);
+      // 0 = data returned to the block (carrier lost it), 1 = a unit carries the data now, 2 = delivered to a Decryptor: used up for good
+      this.config(Integer.class, (DataBuild b, Integer v) -> {
+         if (v == 1) {
+            b.held = true;
+         } else if (v == 2) {
+            b.held = false;
+            b.used = true;
+         } else {
+            b.held = false;
+         }
+      });
       this.buildType = () -> new DataBuild();
    }
 
@@ -83,8 +94,10 @@ public class DataBlock extends Block {
       public Block target;
       /** 0..1 download progress of the local player. */
       float dl;
-      /** The data was already taken: the block is deactivated for good. */
+      /** The data was delivered to a Decryptor: the block is deactivated for good (saved). */
       public boolean used;
+      /** A unit carries the data right now: nobody else can take it until the carrier loses it (not saved). */
+      public boolean held;
 
       /** On a campaign sector the data cannot be downloaded until the sector is captured. */
       boolean sectorLocked() {
@@ -116,13 +129,13 @@ public class DataBlock extends Block {
 
       public void updateTile() {
          Unit u = Vars.headless || Vars.player == null ? null : Vars.player.unit();
-         boolean near = u != null && u.isValid() && u.team == this.team && this.target != null && !this.used && !sectorLocked() && u.within(this, range)
+         boolean near = u != null && u.isValid() && u.team == this.team && this.target != null && !this.used && !this.held && !sectorLocked() && u.within(this, range)
             && !(DataSystem.carried == this.target && DataSystem.carrier == u);
          this.dl = near ? Math.min(1.0F, this.dl + Time.delta / dlTime) : Math.max(0.0F, this.dl - Time.delta / (dlTime / 2.0F));
          if (near && this.dl >= 1.0F) {
-            DataSystem.give(this.target, u);
+            DataSystem.give(this.target, u, this);
             this.dl = 0.0F;
-            this.configure(Boolean.TRUE);
+            this.configure(1);
             if (Vars.ui != null) Vars.ui.showInfoToast(Core.bundle.format("anomalies.data.got", this.target.localizedName), 2.5F);
          }
       }

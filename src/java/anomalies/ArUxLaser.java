@@ -15,8 +15,8 @@ import mindustry.graphics.Layer;
  */
 public class ArUxLaser extends ContinuousFlameBulletType {
    /** half width of the beam at the muzzle, world units */
-   static final float HALF_WIDTH = 1.5F;
-   static final int PARTS = 14;
+   static final float HALF_WIDTH = 5.5F;
+   static final int PARTS = 32;
 
    public void draw(Bullet b) {
       float f = Mathf.clamp(b.time / 4.0F) * Mathf.clamp((b.lifetime - b.time) / 16.0F);
@@ -41,16 +41,18 @@ public class ArUxLaser extends ContinuousFlameBulletType {
       Draw.z(Layer.bullet + 0.01F);
       float rot = Time.time * 1.5F;
       Draw.color(ArUxUnit.yellow);
-      for (int k = 0; k < 4; ++k) Drawf.tri(b.x, b.y, 1.0F * f, 4.5F * f, rot + k * 90.0F);
+      for (int k = 0; k < 4; ++k) Drawf.tri(b.x, b.y, 1.6F * f, 6.5F * f, rot + k * 90.0F);
       Draw.color(arc.graphics.Color.white);
-      for (int k = 0; k < 4; ++k) Drawf.tri(b.x, b.y, 0.5F * f, 2.5F * f, rot + k * 90.0F);
+      for (int k = 0; k < 4; ++k) Drawf.tri(b.x, b.y, 0.8F * f, 3.5F * f, rot + k * 90.0F);
       Drawf.light(b.x, b.y, b.x + cos * len, b.y + sin * len, 20.0F, ArUxUnit.yellow, 0.6F * f);
       Draw.reset();
    }
 
-   /** Beam half width at the fraction t of its length: narrows to a sharp point. */
+   /** Beam half width at the fraction t of its length: wide for most of it, then a smooth taper to a sharp point. */
    static float halfWidth(float t, float layer, float fade) {
-      float wobble = 1.0F + 0.08F * Mathf.sin(Time.time * 0.7F + t * 9.0F);
-      return HALF_WIDTH * layer * fade * wobble * (float)Math.pow(1.0F - t, 1.7F);
+      float wobble = 1.0F + 0.06F * Mathf.sin(Time.time * 0.7F + t * 9.0F);
+      float tail = Mathf.clamp((1.0F - t) / 0.7F); // the last 70% of the beam narrow down
+      float taper = 0.5F * tail * tail * (3.0F - 2.0F * tail) + 0.5F * tail; // smooth start, pointed end
+      return HALF_WIDTH * layer * fade * wobble * (1.0F - 0.2F * t) * taper;
    }
 }
