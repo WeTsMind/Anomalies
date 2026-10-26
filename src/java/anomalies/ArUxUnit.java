@@ -38,8 +38,10 @@ public class ArUxUnit extends UnitType {
    /** the slit ends at the front edge of the hull: the laser starts there */
    static final float LASER_Y = 8.0F;
    static final Color yellow = Color.valueOf("ffd21f");
+   /** centre of the leg hub, distance from the hip along the leg */
+   static final float HUB_ARC = 3.0F;
    TextureRegion cannonTeam;
-   /** 0 = upper part (at the hull), 1 = knee part, 2 = foot */
+   /** 0 = hub (at the hull), 1 = middle chevron, 2 = foot arrow */
    final TextureRegion[] legSprites = new TextureRegion[3];
 
    public ArUxUnit(String name) {
@@ -73,19 +75,20 @@ public class ArUxUnit extends UnitType {
       this.legMinLength = 0.2F;
       this.legLengthScl = 0.96F;
 
-      // 1) the laser: the Sublimate flame (same bullet type and values), yellow. It must be a fresh bullet (not a copy of the
+      // 1) the laser: the Sublimate flame (same bullet type), yellow, 3 tiles long, 60 damage per second. It must be a fresh bullet (not a copy of the
       // turret's one): a copy is never loaded by the game and draws the "Oh no" missing texture.
       ContinuousFlameBulletType flame = new ContinuousFlameBulletType();
-      flame.damage = 78.0F;
-      flame.length = 125.0F;
+      flame.damage = 5.0F; // hits every 5 ticks: 12 hits per second = 60 damage per second
+      flame.length = 24.0F; // 3 tiles
       flame.knockback = 1.0F;
       flame.pierceCap = 2;
-      flame.buildingDamageMultiplier = 0.3F;
+      flame.buildingDamageMultiplier = 1.0F;
       flame.colors = new Color[]{
          Color.valueOf("ff9e2f").a(0.55F), Color.valueOf("ffc83a").a(0.7F), Color.valueOf("ffe14a").a(0.8F), Color.valueOf("fff2a8"), Color.white};
+      flame.flareColor = yellow; // the star of the laser
       flame.lightColor = yellow;
       flame.hitColor = yellow;
-      flame.lifetime = 120.0F; // one burst of the laser, then it reloads
+      flame.lifetime = 120.0F; // kept alive by the weapon while the fire button is held
       float laserLen = flame.length;
       this.range = laserLen;
       this.maxRange = laserLen;
@@ -96,7 +99,8 @@ public class ArUxUnit extends UnitType {
       laser.mirror = false;
       laser.rotate = false;
       laser.continuous = true;
-      laser.reload = 240.0F;
+      laser.alwaysContinuous = true; // the laser stays on as long as the fire button is held
+      laser.reload = 30.0F; // short pause after release
       laser.recoil = 0.0F;
       laser.shootSound = soundOf(Blocks.sublimate, Sounds.shoot);
       laser.bullet = flame;
@@ -191,14 +195,18 @@ public class ArUxUnit extends UnitType {
       super.draw(unit);
    }
 
-   /** Every leg: foot at the bottom, the knee part lies on the foot, the upper part lies on the knee part (the hull is drawn over all). */
+   /**
+    * Every leg is three sprites lying on top of each other along the leg (hip -> knee -> foot): the hub at the hull, the small
+    * chevron in the middle and the big arrow on the ground (toe exactly on the foot point, so it never lifts off while walking).
+    * Drawing order: arrow at the bottom, the chevron over it, the hub over both (the hull is drawn over all).
+    */
    void drawLegSprites(Unit unit, float z) {
       if (!(unit instanceof Legsc)) return;
       Leg[] legs = ((Legsc)unit).legs();
       if (legs == null) return;
-      TextureRegion upper = this.legSprites[0], mid = this.legSprites[1], foot = this.legSprites[2];
+      TextureRegion hub = this.legSprites[0], mid = this.legSprites[1], foot = this.legSprites[2];
       float cr = Mathf.cosDeg(unit.rotation), sr = Mathf.sinDeg(unit.rotation);
-      for (int pass = 0; pass < 3; ++pass) { // 0 = feet, 1 = knee parts, 2 = upper parts
+      for (int pass = 0; pass < 3; ++pass) { // 0 = arrows (feet), 1 = chevrons, 2 = hubs
          Draw.z(z - 0.04F + 0.01F * pass);
          for (Leg leg : legs) {
             float fx = leg.base.x, fy = leg.base.y;
@@ -208,21 +216,25 @@ public class ArUxUnit extends UnitType {
             float hy = unit.y + Angles.trnsy(toFoot, this.legBaseOffset);
             // +1 for legs on the right side of the unit, -1 on the left (the sprites are mirrored)
             float side = ((fx - unit.x) * sr - (fy - unit.y) * cr) >= 0.0F ? 1.0F : -1.0F;
-            float a1 = Angles.angle(hx, hy, jx, jy); // upper part: hip -> knee
-            float a2 = Angles.angle(jx, jy, fx, fy); // knee part and foot: knee -> foot
-            if (pass == 0) {
-               // the toe sits on the ground point, the inner end is hidden under the knee part
-               float half = foot.width * Draw.scl * 0.5F - 1.0F;
-               piece(foot, fx - Angles.trnsx(a2, half), fy - Angles.trnsy(a2, half), a2, side);
-            } else if (pass == 1) {
-               // starts a little before the knee and lies on the foot
-               float half = mid.width * Draw.scl * 0.5F - 0.75F;
-               piece(mid, jx + Angles.trnsx(a2, half), jy + Angles.trnsy(a2, half), a2, side);
+            float l1 = Mathf.dst(hx, hy, jx, jy), l2 = Mathf.dst(jx, jy, fx, fy);
+            float total = l1 + l2;
+            // centres along the path: hub near the hip, arrow with its toe on the ground, chevron in between
+            float s0 = HUB_ARC;
+            float s2 = Math.max(s0, total + 1.0F - foot.width * Draw.scl * 0.5F);
+            float s1 = (s0 + s2) * 0.5F;
+            float s = pass == 0 ? s2 : (pass == 1 ? s1 : s0);
+            TextureRegion r = pass == 0 ? foot : (pass == 1 ? mid : hub);
+            float px, py, a;
+            if (s <= l1) {
+               a = Angles.angle(hx, hy, jx, jy);
+               px = hx + Angles.trnsx(a, s);
+               py = hy + Angles.trnsy(a, s);
             } else {
-               // its outer end reaches a little over the knee and lies on the knee part, the inner end is under the hull
-               float half = upper.width * Draw.scl * 0.5F - 0.75F;
-               piece(upper, jx - Angles.trnsx(a1, half), jy - Angles.trnsy(a1, half), a1, side);
+               a = Angles.angle(jx, jy, fx, fy);
+               px = jx + Angles.trnsx(a, s - l1);
+               py = jy + Angles.trnsy(a, s - l1);
             }
+            piece(r, px, py, a, side);
          }
       }
       Draw.reset();
