@@ -7,6 +7,7 @@ import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
 import arc.math.Mathf;
+import mindustry.Vars;
 import mindustry.content.Blocks;
 import mindustry.content.Fx;
 import mindustry.entities.Leg;
@@ -65,13 +66,15 @@ public class ArUxUnit extends UnitType {
       this.lockLegBase = true;
       this.legCount = 6;
       this.legGroupSize = 3;
-      this.legLength = 18.0F;
+      this.legLength = 15.5F;
       this.legBaseOffset = 5.0F;
-      this.legMoveSpace = 1.0F;
+      // gait of Tecta: two tripods (3 + 3 legs) that always stay locked to the hull, long heavy strides, straighter legs
+      this.legMoveSpace = 1.4F;
       this.legForwardScl = 0.7F;
       this.legContinuousMove = true;
-      this.legStraightness = 0.25F;
-      this.legMaxLength = 1.1F;
+      this.legStraightness = 0.4F;
+      this.legMaxLength = 1.2F;
+      setField(this, "baseLegStraightness", 0.5F);
       this.legMinLength = 0.2F;
       this.legLengthScl = 0.96F;
 
@@ -133,7 +136,7 @@ public class ArUxUnit extends UnitType {
       cannon.recoil = 0.0F;
       cannon.shootCone = 15.0F;
       cannon.reload = 120.0F;
-      cannon.shootSound = Sounds.shoot;
+      cannon.shootSound = cannonSound();
       cannon.ejectEffect = Fx.none;
       AnomalyTurret.OrbShot ball = new AnomalyTurret.OrbShot();
       ball.rangeOverride = 110.0F;
@@ -156,6 +159,24 @@ public class ArUxUnit extends UnitType {
       shocker.shootSound = soundOf(Blocks.arc, Sounds.shoot);
       shocker.bullet = new ShockBolt(122.0F);
       this.weapons.add(shocker);
+   }
+
+   /** The own shot sound of the cannon (sounds/arux-cannon.ogg in the mod), falls back to the regular shot if it cannot be loaded. */
+   static Sound cannonSound() {
+      try {
+         Sound snd = Vars.tree.loadSound("arux-cannon");
+         if (snd != null) return snd;
+      } catch (Throwable ignored) {
+      }
+      return Sounds.shoot;
+   }
+
+   /** Sets a float field by name; silently does nothing when the field does not exist in this game version. */
+   static void setField(Object target, String name, float value) {
+      try {
+         target.getClass().getField(name).setFloat(target, value);
+      } catch (Throwable ignored) {
+      }
    }
 
    /** Shoot sound of a vanilla turret (falls back to the given sound). */

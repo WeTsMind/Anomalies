@@ -19,21 +19,36 @@ public class ArUxLaser extends ContinuousFlameBulletType {
    static final float HALF_WIDTH = 4.5F;
    static final int PARTS = 32;
 
+   /** how long the beam takes to die out after the owner stops shooting, ticks */
+   static final float FADE_TICKS = 26.0F;
+   /** how fast it flares up again when the owner starts shooting during the fade-out, ticks */
+   static final float RELIGHT_TICKS = 8.0F;
+
    @Override
    public void update(Bullet b) {
-      super.update(b);
-      // the beam vanishes the moment the owner stops shooting
-      if (b.owner instanceof Unit u && !u.isShooting()) b.remove();
+      // b.fdata is the fade-out progress: 0 = the beam burns, 1 = gone
+      boolean off = b.owner instanceof Unit u && !u.isShooting();
+      if (off) b.fdata = Math.min(1.0F, b.fdata + Time.delta / FADE_TICKS);
+      else b.fdata = Math.max(0.0F, b.fdata - Time.delta / RELIGHT_TICKS);
+      if (b.fdata >= 1.0F) {
+         b.remove();
+         return;
+      }
+      // the damage stops when the beam has already shrunk to about half
+      if (b.fdata < 0.5F) super.update(b);
    }
 
    @Override
    public void draw(Bullet b) {
-      float f = Mathf.clamp(b.time / 4.0F) * Mathf.clamp((b.lifetime - b.time) / 16.0F);
+      float r = b.fdata;
+      float e = r * r * (3.0F - 2.0F * r); // smooth fade-out progress
+      float f = Mathf.clamp(b.time / 4.0F) * Mathf.clamp((b.lifetime - b.time) / 16.0F) * (1.0F - 0.75F * e);
+      if (r > 0.0F) f *= 0.85F + 0.15F * Mathf.sin(Time.time * 2.3F); // the dying beam flickers
       if (f <= 0.01F) return;
       float ang = b.rotation();
       float cos = Mathf.cosDeg(ang), sin = Mathf.sinDeg(ang);
       float nx = -sin, ny = cos;
-      float len = this.length;
+      float len = this.length * (1.0F - e); // the beam pulls back into the muzzle while it fades
       Draw.z(Layer.bullet);
       for (int i = 0; i < this.colors.length; ++i) {
          float k = 1.0F - i * 0.2F; // outer layer is the widest, the white core the thinnest

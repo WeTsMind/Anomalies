@@ -33,6 +33,8 @@ public class SeraphCore extends CoreBlock {
       this.health = 1500;
       this.itemCapacity = 4000;
       this.unitCapModifier = 8;
+      // thrusters sit tucked against the core instead of floating away from it (vanilla: 14 / 4)
+      this.thrusterLength = -2.0F;
       this.alwaysUnlocked = true;
       this.requirements(Category.effect, BuildVisibility.shown, ItemStack.with(new Object[]{Items.copper, 1500, Items.lead, 1000, Items.silicon, 500}));
       this.buildType = () -> new SeraphBuild();
@@ -57,6 +59,12 @@ public class SeraphCore extends CoreBlock {
    void fixThrusters() {
       this.thruster1 = thruster(this.name + "-thruster1", "core-shard-thruster1");
       this.thruster2 = thruster(this.name + "-thruster2", "core-shard-thruster2");
+      // the mod has no "-team" sprite: the landing animation drew the error texture ("oh no") tinted in the team colour in the centre
+      if (!Core.atlas.has(this.name + "-team")) {
+         TextureRegion clear = Core.atlas.find("clear");
+         this.teamRegion = clear;
+         if (this.teamRegions != null) java.util.Arrays.fill(this.teamRegions, clear);
+      }
    }
 
    static TextureRegion thruster(String own, String vanilla) {
