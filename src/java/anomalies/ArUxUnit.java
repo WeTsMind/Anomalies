@@ -42,6 +42,7 @@ public class ArUxUnit extends UnitType {
    static final float HUB_ARC = 3.0F;
    TextureRegion cannonTeam;
    TextureRegion hubRegion;
+   TextureRegion midRegion;
 
    public ArUxUnit(String name) {
       super(name);
@@ -174,8 +175,9 @@ public class ArUxUnit extends UnitType {
       this.cannonTeam = Core.atlas.find(this.name + "-cannon-team");
       // legs are drawn by the game itself, exactly like Alloy. Foot and the middle chevron
       // (both leg segments) come from the game; the hub (first part) is drawn over them next to the hull, see drawHubs()
-      this.legRegion = Core.atlas.find(this.name + "-leg-mid");
-      this.legBaseRegion = Core.atlas.find(this.name + "-leg-mid");
+      this.legRegion = Core.atlas.find("clear"); // the middle part and the hub are drawn by drawHubs(), the game only draws the foot
+      this.legBaseRegion = Core.atlas.find("clear");
+      this.midRegion = Core.atlas.find(this.name + "-leg-mid");
       this.hubRegion = Core.atlas.find(this.name + "-leg-upper");
       this.baseJointRegion = Core.atlas.find("clear"); // the hub is drawn by drawHubs() below, not under the hull
       this.footRegion = Core.atlas.find(this.name + "-leg-foot");
@@ -192,14 +194,18 @@ public class ArUxUnit extends UnitType {
       drawHubs(unit);
    }
 
-   /** The first part of every leg: the hub next to the hull, over the middle part of the leg and under the hull. */
+   /**
+    * The first two parts of every leg. The middle part starts exactly under the hub (its rear end is anchored in the centre of the hub, so
+    * it comes out from under it) and is stretched to the foot; the hub lies over it. Every leg has its own thin z band, so neighbouring
+    * legs never cut through each other. All of it is over the foot (the game draws it at z - 0.02) and under the hull (z).
+    */
    void drawHubs(Unit unit) {
-      if (!(unit instanceof Legsc) || this.hubRegion == null || !this.hubRegion.found()) return;
+      if (!(unit instanceof Legsc) || this.hubRegion == null || !this.hubRegion.found() || this.midRegion == null || !this.midRegion.found()) return;
       Leg[] legs = ((Legsc)unit).legs();
       if (legs == null) return;
       float z = unit.elevation > 0.5F ? (this.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit) : this.groundLayer;
-      Draw.z(z - 0.005F); // the game draws the legs at z - 0.02 and the hull at z
-      for (Leg leg : legs) {
+      for (int i = 0; i < legs.length; ++i) {
+         Leg leg = legs[i];
          float fx = leg.base.x, fy = leg.base.y;
          float jx = leg.joint.x, jy = leg.joint.y;
          float toFoot = Angles.angle(unit.x, unit.y, fx, fy);
@@ -216,6 +222,14 @@ public class ArUxUnit extends UnitType {
             px = jx + Angles.trnsx(a, HUB_ARC - l1);
             py = jy + Angles.trnsy(a, HUB_ARC - l1);
          }
+         float zi = z - 0.009F + 0.0006F * i;
+         // middle part: from the centre of the hub (under it) to the foot
+         float len = Mathf.dst(px, py, fx, fy);
+         float ang = Angles.angle(px, py, fx, fy);
+         Draw.z(zi);
+         Draw.rect(this.midRegion, (px + fx) * 0.5F, (py + fy) * 0.5F, Math.max(len, 1.0F), this.midRegion.height * Draw.scl, ang);
+         // first part: the hub over it
+         Draw.z(zi + 0.0003F);
          Draw.rect(this.hubRegion, px, py, this.hubRegion.width * Draw.scl, this.hubRegion.height * Draw.scl, a);
       }
       Draw.reset();
