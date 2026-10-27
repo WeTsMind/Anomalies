@@ -22,28 +22,46 @@ public class ArUxLaser extends ContinuousFlameBulletType {
    /** how long the beam takes to die out after the owner stops shooting, ticks */
    static final float FADE_TICKS = 26.0F;
    /** how fast it flares up again when the owner starts shooting during the fade-out, ticks */
-   static final float RELIGHT_TICKS = 8.0F;
+   static final float RELIGHT_TICKS = 4.0F;
+   /** the owner must be not shooting for this long before the fade-out starts, so a one-tick blip never changes the beam */
+   static final float HOLD_TICKS = 5.0F;
+
+   /** per-bullet fade state, kept in Bullet.data (the game clears it when the bullet is recycled) */
+   static final class Fade {
+      float progress; // 0 = the beam burns at full size, 1 = gone
+      float idle;     // ticks the owner has not been shooting
+   }
+
+   static Fade fade(Bullet b) {
+      if (!(b.data instanceof Fade)) b.data = new Fade();
+      return (Fade)b.data;
+   }
 
    @Override
    public void update(Bullet b) {
-      // b.fdata is the fade-out progress: 0 = the beam burns, 1 = gone
+      Fade fd = fade(b);
       boolean off = b.owner instanceof Unit u && !u.isShooting();
-      if (off) b.fdata = Math.min(1.0F, b.fdata + Time.delta / FADE_TICKS);
-      else b.fdata = Math.max(0.0F, b.fdata - Time.delta / RELIGHT_TICKS);
-      if (b.fdata >= 1.0F) {
+      if (off) {
+         fd.idle += Time.delta;
+         if (fd.idle > HOLD_TICKS) fd.progress = Math.min(1.0F, fd.progress + Time.delta / FADE_TICKS);
+      } else {
+         fd.idle = 0.0F;
+         fd.progress = Math.max(0.0F, fd.progress - Time.delta / RELIGHT_TICKS);
+      }
+      if (fd.progress >= 1.0F) {
          b.remove();
          return;
       }
       // the damage stops when the beam has already shrunk to about half
-      if (b.fdata < 0.5F) super.update(b);
+      if (fd.progress < 0.5F) super.update(b);
    }
 
    @Override
    public void draw(Bullet b) {
-      float r = b.fdata;
+      float r = fade(b).progress;
       float e = r * r * (3.0F - 2.0F * r); // smooth fade-out progress
       float f = Mathf.clamp(b.time / 4.0F) * Mathf.clamp((b.lifetime - b.time) / 16.0F) * (1.0F - 0.75F * e);
-      if (r > 0.0F) f *= 0.85F + 0.15F * Mathf.sin(Time.time * 2.3F); // the dying beam flickers
+      if (r > 0.0F) f *= 0.85F + 0.15F * Mathf.sin(Time.time * 2.3F); // only the dying beam flickers
       if (f <= 0.01F) return;
       float ang = b.rotation();
       float cos = Mathf.cosDeg(ang), sin = Mathf.sinDeg(ang);

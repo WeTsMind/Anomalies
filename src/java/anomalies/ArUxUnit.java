@@ -63,19 +63,21 @@ public class ArUxUnit extends UnitType {
       // six legs: 3 per side (front, middle, rear)
       this.hovering = true;
       this.allowLegStep = true;
-      this.lockLegBase = true;
       this.legCount = 6;
-      this.legGroupSize = 3;
       this.legLength = 15.5F;
       this.legBaseOffset = 5.0F;
-      // gait of Tecta: two tripods (3 + 3 legs) that always stay locked to the hull, long heavy strides, straighter legs
-      this.legMoveSpace = 1.4F;
-      this.legForwardScl = 0.7F;
-      this.legContinuousMove = true;
-      this.legStraightness = 0.4F;
-      this.legMaxLength = 1.2F;
-      setField(this, "baseLegStraightness", 0.5F);
+      // gait of Arkyid: legs are not locked to the hull, no continuous stepping, they step in pairs (3 groups of 2) with a pair offset, spider-like bent knees
+      this.lockLegBase = false;
+      this.legContinuousMove = false;
+      this.legGroupSize = 2;
+      this.legMoveSpace = 1.0F;
+      this.legForwardScl = 1.0F;
+      this.legStraightness = 0.0F;
+      this.legMaxLength = 1.1F;
       this.legMinLength = 0.2F;
+      setField(this, "legPairOffset", 3.0F);
+      setField(this, "legExtension", -7.5F); // Arkyid has -15 on 30 long legs, scaled to the shorter legs of Arux
+      setField(this, "legSpeed", 0.2F);
       this.legLengthScl = 0.96F;
 
       // 1) the laser: the Sublimate flame (same bullet type), yellow, 5 tiles long, 260 damage per second, wide beam with a smooth taper to a point. It must be a fresh bullet (not a copy of the
