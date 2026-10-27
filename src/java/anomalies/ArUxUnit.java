@@ -41,6 +41,7 @@ public class ArUxUnit extends UnitType {
    /** centre of the leg hub, distance from the hip along the leg */
    static final float HUB_ARC = 3.0F;
    TextureRegion cannonTeam;
+   TextureRegion hubRegion;
 
    public ArUxUnit(String name) {
       super(name);
@@ -171,16 +172,52 @@ public class ArUxUnit extends UnitType {
    public void load() {
       super.load();
       this.cannonTeam = Core.atlas.find(this.name + "-cannon-team");
-      // legs are drawn by the game itself, exactly like Alloy. Order inside a leg (bottom to top): foot, middle chevron
-      // (both leg segments), then the hub at the hip on top, so the middle part is always under the first part
+      // legs are drawn by the game itself, exactly like Alloy. Foot and the middle chevron
+      // (both leg segments) come from the game; the hub (first part) is drawn over them next to the hull, see drawHubs()
       this.legRegion = Core.atlas.find(this.name + "-leg-mid");
       this.legBaseRegion = Core.atlas.find(this.name + "-leg-mid");
-      this.baseJointRegion = Core.atlas.find(this.name + "-leg-upper");
+      this.hubRegion = Core.atlas.find(this.name + "-leg-upper");
+      this.baseJointRegion = Core.atlas.find("clear"); // the hub is drawn by drawHubs() below, not under the hull
       this.footRegion = Core.atlas.find(this.name + "-leg-foot");
       if (Core.atlas.has(this.name + "-icon")) {
          TextureRegion icon = Core.atlas.find(this.name + "-icon");
          this.fullIcon = icon;
          this.uiIcon = icon;
       }
+   }
+
+   @Override
+   public void draw(Unit unit) {
+      super.draw(unit);
+      drawHubs(unit);
+   }
+
+   /** The first part of every leg: the hub next to the hull, over the middle part of the leg and under the hull. */
+   void drawHubs(Unit unit) {
+      if (!(unit instanceof Legsc) || this.hubRegion == null || !this.hubRegion.found()) return;
+      Leg[] legs = ((Legsc)unit).legs();
+      if (legs == null) return;
+      float z = unit.elevation > 0.5F ? (this.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit) : this.groundLayer;
+      Draw.z(z - 0.005F); // the game draws the legs at z - 0.02 and the hull at z
+      for (Leg leg : legs) {
+         float fx = leg.base.x, fy = leg.base.y;
+         float jx = leg.joint.x, jy = leg.joint.y;
+         float toFoot = Angles.angle(unit.x, unit.y, fx, fy);
+         float hx = unit.x + Angles.trnsx(toFoot, this.legBaseOffset);
+         float hy = unit.y + Angles.trnsy(toFoot, this.legBaseOffset);
+         float l1 = Mathf.dst(hx, hy, jx, jy);
+         float a, px, py;
+         if (HUB_ARC <= l1) {
+            a = Angles.angle(hx, hy, jx, jy);
+            px = hx + Angles.trnsx(a, HUB_ARC);
+            py = hy + Angles.trnsy(a, HUB_ARC);
+         } else {
+            a = Angles.angle(jx, jy, fx, fy);
+            px = jx + Angles.trnsx(a, HUB_ARC - l1);
+            py = jy + Angles.trnsy(a, HUB_ARC - l1);
+         }
+         Draw.rect(this.hubRegion, px, py, this.hubRegion.width * Draw.scl, this.hubRegion.height * Draw.scl, a);
+      }
+      Draw.reset();
    }
 }
