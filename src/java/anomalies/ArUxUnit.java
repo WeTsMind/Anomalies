@@ -171,9 +171,11 @@ public class ArUxUnit extends UnitType {
    public void load() {
       super.load();
       this.cannonTeam = Core.atlas.find(this.name + "-cannon-team");
-      // legs are drawn by the game itself, exactly like Alloy: hip->knee piece, knee->foot piece and the foot
-      this.legRegion = Core.atlas.find(this.name + "-leg-upper");
+      // legs are drawn by the game itself, exactly like Alloy. Order inside a leg (bottom to top): foot, middle chevron
+      // (both leg segments), then the hub at the hip on top, so the middle part is always under the first part
+      this.legRegion = Core.atlas.find(this.name + "-leg-mid");
       this.legBaseRegion = Core.atlas.find(this.name + "-leg-mid");
+      this.baseJointRegion = Core.atlas.find(this.name + "-leg-upper");
       this.footRegion = Core.atlas.find(this.name + "-leg-foot");
       if (Core.atlas.has(this.name + "-icon")) {
          TextureRegion icon = Core.atlas.find(this.name + "-icon");

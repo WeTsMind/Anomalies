@@ -6,6 +6,7 @@ import arc.math.Mathf;
 import arc.util.Time;
 import mindustry.entities.bullet.ContinuousFlameBulletType;
 import mindustry.gen.Bullet;
+import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 
@@ -15,9 +16,17 @@ import mindustry.graphics.Layer;
  */
 public class ArUxLaser extends ContinuousFlameBulletType {
    /** half width of the beam at the muzzle, world units */
-   static final float HALF_WIDTH = 5.5F;
+   static final float HALF_WIDTH = 4.5F;
    static final int PARTS = 32;
 
+   @Override
+   public void update(Bullet b) {
+      super.update(b);
+      // the beam vanishes the moment the owner stops shooting
+      if (b.owner instanceof Unit u && !u.isShooting()) b.remove();
+   }
+
+   @Override
    public void draw(Bullet b) {
       float f = Mathf.clamp(b.time / 4.0F) * Mathf.clamp((b.lifetime - b.time) / 16.0F);
       if (f <= 0.01F) return;
@@ -29,6 +38,7 @@ public class ArUxLaser extends ContinuousFlameBulletType {
       for (int i = 0; i < this.colors.length; ++i) {
          float k = 1.0F - i * 0.2F; // outer layer is the widest, the white core the thinnest
          Draw.color(this.colors[i]);
+         Fill.circle(b.x, b.y, halfWidth(0.0F, k, f)); // round cap: the beam does not look cut off at the start
          for (int s = 0; s < PARTS; ++s) {
             float t0 = (float)s / PARTS, t1 = (float)(s + 1) / PARTS;
             float w0 = halfWidth(t0, k, f), w1 = halfWidth(t1, k, f);
@@ -41,9 +51,9 @@ public class ArUxLaser extends ContinuousFlameBulletType {
       Draw.z(Layer.bullet + 0.01F);
       float rot = Time.time * 1.5F;
       Draw.color(ArUxUnit.yellow);
-      for (int k = 0; k < 4; ++k) Drawf.tri(b.x, b.y, 1.6F * f, 6.5F * f, rot + k * 90.0F);
+      for (int k = 0; k < 4; ++k) Drawf.tri(b.x, b.y, 1.2F * f, 5.0F * f, rot + k * 90.0F);
       Draw.color(arc.graphics.Color.white);
-      for (int k = 0; k < 4; ++k) Drawf.tri(b.x, b.y, 0.8F * f, 3.5F * f, rot + k * 90.0F);
+      for (int k = 0; k < 4; ++k) Drawf.tri(b.x, b.y, 0.6F * f, 2.8F * f, rot + k * 90.0F);
       Drawf.light(b.x, b.y, b.x + cos * len, b.y + sin * len, 20.0F, ArUxUnit.yellow, 0.6F * f);
       Draw.reset();
    }
@@ -51,7 +61,7 @@ public class ArUxLaser extends ContinuousFlameBulletType {
    /** Beam half width at the fraction t of its length: wide for most of it, then a smooth taper to a sharp point. */
    static float halfWidth(float t, float layer, float fade) {
       float wobble = 1.0F + 0.06F * Mathf.sin(Time.time * 0.7F + t * 9.0F);
-      float tail = Mathf.clamp((1.0F - t) / 0.7F); // the last 70% of the beam narrow down
+      float tail = Mathf.clamp((1.0F - t) / 0.6F); // the last 60% of the beam narrow down
       float taper = 0.5F * tail * tail * (3.0F - 2.0F * tail) + 0.5F * tail; // smooth start, pointed end
       return HALF_WIDTH * layer * fade * wobble * (1.0F - 0.2F * t) * taper;
    }

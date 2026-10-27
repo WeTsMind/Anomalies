@@ -50,6 +50,19 @@ public class SeraphCore extends CoreBlock {
       for(int var1 = 0; var1 < 4; ++var1) {
          this.seraphWings[var1] = Core.atlas.find("anomalies-seraph-wing-" + var1);
       }
+      this.fixThrusters();
+   }
+
+   /** Landing thrusters: the mod has no own thruster sprites, without this the game draws the "Oh no" error texture in the centre of the core while it lands. */
+   void fixThrusters() {
+      this.thruster1 = thruster(this.name + "-thruster1", "core-shard-thruster1");
+      this.thruster2 = thruster(this.name + "-thruster2", "core-shard-thruster2");
+   }
+
+   static TextureRegion thruster(String own, String vanilla) {
+      if (Core.atlas.has(own)) return Core.atlas.find(own);
+      if (Core.atlas.has(vanilla)) return Core.atlas.find(vanilla);
+      return Core.atlas.find("clear");
    }
 
    public boolean canPlaceOn(Tile var1, Team var2, int var3) {

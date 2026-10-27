@@ -267,10 +267,18 @@ public class WallBreaker extends Block {
                Draw.blend();
             }
 
-            // beam: the sprite bar stretched between emitter and impact (5px of 48 are empty at each end)
+            // beam: the sprite's stripes (dark edge, green, white core) run ACROSS the beam, like the lasers of vanilla Mindustry:
+            // the sprite's x axis is stretched along the beam, its y axis (48 px, 5 px of it empty at each end) is the thickness
             float len = f1 - f0;
+            float thick = (5.0F + 2.0F * heat) * pulse;
+            float mx = (sx + ex) / 2.0F, my = (sy + ey) / 2.0F;
+            // soft glow around the beam
+            Draw.blend(Blending.additive);
+            Draw.color(WallBreaker.laserCol, 0.35F * Math.min(1.0F, b * pulse));
+            Draw.rect(WallBreaker.this.beamRegion, mx, my, len, thick * 1.9F * 48.0F / 38.0F, ang);
+            Draw.blend();
             Draw.color(Color.white, Math.min(1.0F, b * pulse));
-            Draw.rect(WallBreaker.this.beamRegion, (sx + ex) / 2.0F, (sy + ey) / 2.0F, (2.4F + 1.2F * heat) * pulse, len * 48.0F / 38.0F, ang - 90.0F);
+            Draw.rect(WallBreaker.this.beamRegion, mx, my, len, thick * 48.0F / 38.0F, ang);
 
             // emitter ring
             Draw.color(Color.white, b);

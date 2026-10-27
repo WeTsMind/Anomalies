@@ -268,6 +268,8 @@ public class SeraphUnit extends UnitType {
       /** current (this frame) position of the wing end: the ribbon always starts exactly on the wing */
       float liveX, liveY;
       boolean live;
+      /** frames spent standing still since the last new point */
+      int idle;
 
       WingTrail(int len) {
          pts = new float[len * 2];
@@ -275,6 +277,7 @@ public class SeraphUnit extends UnitType {
 
       void clear() {
          n = 0;
+         idle = 0;
          live = false;
       }
 
@@ -300,7 +303,17 @@ public class SeraphUnit extends UnitType {
          int max = pts.length / 2;
          if (n > 0) {
             float dx = x - pts[(n - 1) * 2], dy = y - pts[(n - 1) * 2 + 1];
-            if (dx * dx + dy * dy < 0.0004F) return; // standing still: do not pile up points
+            if (dx * dx + dy * dy < 0.0004F) {
+               // standing still (mining, building, hovering): do not pile up points, and let the old ones fade away,
+               // otherwise the trail would hang there forever
+               if (++idle >= 2) {
+                  idle = 0;
+                  System.arraycopy(pts, 2, pts, 0, pts.length - 2);
+                  n--;
+               }
+               return;
+            }
+            idle = 0;
          }
          if (n == max) {
             System.arraycopy(pts, 2, pts, 0, pts.length - 2);
