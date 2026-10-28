@@ -3,7 +3,9 @@ package anomalies;
 import arc.Core;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
+import arc.math.Interp;
 import arc.math.Mathf;
+import arc.scene.ui.layout.Scl;
 import arc.util.Time;
 import mindustry.Vars;
 import mindustry.content.Items;
@@ -44,8 +46,58 @@ public class OphanCore extends CoreBlock {
 
    /** Landing thrusters: the mod has no own thruster sprites, without this the game draws the "Oh no" error texture in the centre of the core while it lands. */
    void fixThrusters() {
-      this.thruster1 = thruster(this.name + "-thruster1", "core-shard-thruster1");
-      this.thruster2 = thruster(this.name + "-thruster2", "core-shard-thruster2");
+      // the Ophan core has no side thrusters: they are not drawn (see drawLanding), the regions are empty just in case
+      this.thruster1 = Core.atlas.find("clear");
+      this.thruster2 = Core.atlas.find("clear");
+      // the mod has no "-team" sprite: the landing animation drew the error texture ("oh no") tinted in the team colour in the centre
+      if (!Core.atlas.has(this.name + "-team")) {
+         TextureRegion clear = Core.atlas.find("clear");
+         this.teamRegion = clear;
+         if (this.teamRegions != null) java.util.Arrays.fill(this.teamRegions, clear);
+      }
+   }
+
+   /** Landing without the side thrusters: the same fall (spin, shrinking, heat glow) as the standard core, but no thrusters and no thruster flames. */
+   public void drawLanding(CoreBlock.CoreBuild build, float x, float y) {
+      float fout = Mathf.clamp(Vars.renderer.getLandTime() / landDuration());
+      if (launching()) fout = 1.0F - fout;
+      float scl = Scl.scl(4.0F) / Vars.renderer.getDisplayScale();
+      float s = this.region.width * this.region.scl() * scl * 3.6F * Interp.pow2Out.apply(fout);
+      float rotation = Interp.pow2In.apply(fout) * 135.0F;
+      Draw.color(mindustry.graphics.Pal.lightTrail);
+      Draw.rect("circle-shadow", x, y, s, s);
+      Draw.scl(scl);
+      Draw.color();
+      Draw.rect(this.region, x, y, rotation - 45.0F);
+      Draw.scl();
+      Draw.reset();
+   }
+
+   static float landTicks = -1.0F;
+
+   /** Duration of the core landing; its holder differs between game versions, so it is searched by name (160 ticks by default). */
+   static float landDuration() {
+      if (landTicks > 0.0F) return landTicks;
+      landTicks = 160.0F;
+      Object[][] holders = {{CoreBlock.class, null}, {Vars.class, null}, {Vars.renderer == null ? Object.class : Vars.renderer.getClass(), Vars.renderer}};
+      for (Object[] h : holders) {
+         for (String n : new String[]{"coreLandDuration", "landDuration"}) {
+            try {
+               landTicks = ((Class<?>)h[0]).getField(n).getFloat(h[1]);
+               return landTicks;
+            } catch (Throwable ignored) {
+            }
+         }
+      }
+      return landTicks;
+   }
+
+   static boolean launching() {
+      try {
+         return (Boolean)Vars.renderer.getClass().getMethod("isLaunching").invoke(Vars.renderer);
+      } catch (Throwable ignored) {
+         return false;
+      }
    }
 
    static TextureRegion thruster(String own, String vanilla) {

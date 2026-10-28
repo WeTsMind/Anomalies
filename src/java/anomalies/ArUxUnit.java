@@ -66,18 +66,15 @@ public class ArUxUnit extends UnitType {
       this.legCount = 6;
       this.legLength = 15.5F;
       this.legBaseOffset = 5.0F;
-      // gait of Arkyid: legs are not locked to the hull, no continuous stepping, they step in pairs (3 groups of 2) with a pair offset, spider-like bent knees
-      this.lockLegBase = false;
-      this.legContinuousMove = false;
-      this.legGroupSize = 2;
+      // gait of Alloy: legs locked to the hull, continuous stepping, two tripods of three legs
+      this.lockLegBase = true;
+      this.legContinuousMove = true;
+      this.legGroupSize = 3;
       this.legMoveSpace = 1.0F;
-      this.legForwardScl = 1.0F;
-      this.legStraightness = 0.0F;
+      this.legForwardScl = 0.7F;
+      this.legStraightness = 0.25F;
       this.legMaxLength = 1.1F;
       this.legMinLength = 0.2F;
-      setField(this, "legPairOffset", 3.0F);
-      setField(this, "legExtension", -7.5F); // Arkyid has -15 on 30 long legs, scaled to the shorter legs of Arux
-      setField(this, "legSpeed", 0.2F);
       this.legLengthScl = 0.96F;
 
       // 1) the laser: the Sublimate flame (same bullet type), yellow, 5 tiles long, 260 damage per second, wide beam with a smooth taper to a point. It must be a fresh bullet (not a copy of the
@@ -86,7 +83,8 @@ public class ArUxUnit extends UnitType {
       flame.damage = 260.0F / 12.0F; // hits every 5 ticks: 12 hits per second = 260 damage per second
       flame.length = 40.0F; // 5 tiles
       flame.knockback = 1.0F;
-      flame.pierceCap = 2;
+      flame.pierceCap = 1; // the first block (or unit) on the way ends the beam, like the Sublimate flame
+      setBool(flame, "laserAbsorb", false); // otherwise the engine ignores pierceCap and the damage goes through the blocks
       flame.buildingDamageMultiplier = 1.0F;
       flame.colors = new Color[]{
          Color.valueOf("ff9e2f").a(0.55F), Color.valueOf("ffc83a").a(0.7F), Color.valueOf("ffe14a").a(0.8F), Color.valueOf("fff2a8"), Color.white};
@@ -107,6 +105,9 @@ public class ArUxUnit extends UnitType {
       laser.reload = 30.0F; // short pause after release
       laser.recoil = 0.0F;
       laser.shootSound = soundOf(Blocks.sublimate, Sounds.shoot);
+      // the humming of the Sublimate while the beam burns (the loop is played by the weapon for as long as it fires)
+      setObj(laser, "loopSound", loopOf(Blocks.sublimate));
+      setField(laser, "loopSoundVolume", loopVolumeOf(Blocks.sublimate));
       laser.bullet = flame;
       this.weapons.add(laser);
 
@@ -171,6 +172,44 @@ public class ArUxUnit extends UnitType {
       } catch (Throwable ignored) {
       }
       return Sounds.shoot;
+   }
+
+   /** The looping sound of a turret (the Sublimate hum); the torch sound when the turret has none. */
+   static Sound loopOf(Block turret) {
+      try {
+         Object v = turret.getClass().getField("loopSound").get(turret);
+         if (v instanceof Sound && v != Sounds.none) return (Sound)v;
+      } catch (Throwable ignored) {
+      }
+      try {
+         Object v = Sounds.class.getField("torch").get(null);
+         if (v instanceof Sound) return (Sound)v;
+      } catch (Throwable ignored) {
+      }
+      return Sounds.none;
+   }
+
+   static float loopVolumeOf(Block turret) {
+      try {
+         float v = turret.getClass().getField("loopSoundVolume").getFloat(turret);
+         if (v > 0.0F) return Math.max(v, 1.0F);
+      } catch (Throwable ignored) {
+      }
+      return 1.0F;
+   }
+
+   static void setObj(Object target, String name, Object value) {
+      try {
+         target.getClass().getField(name).set(target, value);
+      } catch (Throwable ignored) {
+      }
+   }
+
+   static void setBool(Object target, String name, boolean value) {
+      try {
+         target.getClass().getField(name).setBoolean(target, value);
+      } catch (Throwable ignored) {
+      }
    }
 
    /** Sets a float field by name; silently does nothing when the field does not exist in this game version. */

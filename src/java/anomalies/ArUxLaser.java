@@ -4,7 +4,10 @@ import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.math.Mathf;
 import arc.util.Time;
+import mindustry.Vars;
+import mindustry.entities.Damage;
 import mindustry.entities.bullet.ContinuousFlameBulletType;
+import mindustry.gen.Building;
 import mindustry.gen.Bullet;
 import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
@@ -30,6 +33,7 @@ public class ArUxLaser extends ContinuousFlameBulletType {
    static final class Fade {
       float progress; // 0 = the beam burns at full size, 1 = gone
       float idle;     // ticks the owner has not been shooting
+      float reach = -1.0F; // current visible length of the beam (shortened by an obstacle), -1 = not measured yet
    }
 
    static Fade fade(Bullet b) {
@@ -52,6 +56,14 @@ public class ArUxLaser extends ContinuousFlameBulletType {
          b.remove();
          return;
       }
+      // an obstacle (a block, a unit) cuts the beam: it shortens to it quickly and grows back smoothly
+      float target = reach(b, this.length);
+      if (fd.reach < 0.0F) fd.reach = target;
+      else {
+         float k = Mathf.clamp(Time.delta * (target < fd.reach ? 0.6F : 0.25F));
+         fd.reach += (target - fd.reach) * k;
+         if (Math.abs(target - fd.reach) < 0.05F) fd.reach = target;
+      }
       // the damage stops when the beam has already shrunk to about half
       if (fd.progress < 0.5F) super.update(b);
    }
@@ -66,7 +78,7 @@ public class ArUxLaser extends ContinuousFlameBulletType {
       float ang = b.rotation();
       float cos = Mathf.cosDeg(ang), sin = Mathf.sinDeg(ang);
       float nx = -sin, ny = cos;
-      float len = this.length * (1.0F - e); // the beam pulls back into the muzzle while it fades
+      float len = (fade(b).reach < 0.0F ? this.length : fade(b).reach) * (1.0F - e); // cut by an obstacle, and pulled back into the muzzle while it fades
       Draw.z(Layer.bullet);
       for (int i = 0; i < this.colors.length; ++i) {
          float k = 1.0F - i * 0.2F; // outer layer is the widest, the white core the thinnest
@@ -89,6 +101,45 @@ public class ArUxLaser extends ContinuousFlameBulletType {
       for (int k = 0; k < 4; ++k) Drawf.tri(b.x, b.y, 0.6F * f, 2.8F * f, rot + k * 90.0F);
       Drawf.light(b.x, b.y, b.x + cos * len, b.y + sin * len, 20.0F, ArUxUnit.yellow, 0.6F * f);
       Draw.reset();
+   }
+
+   static java.lang.reflect.Method pierceLength, findLength;
+   static boolean looked;
+
+   /** How far the beam really reaches: the engine's own measurement (the same one the damage uses), so the picture and the damage always end at the same place. */
+   float reach(Bullet b, float len) {
+      if (!looked) {
+         looked = true;
+         try {
+            pierceLength = Damage.class.getMethod("findPierceLength", Bullet.class, int.class, float.class);
+         } catch (Throwable ignored) {
+         }
+         try {
+            findLength = Damage.class.getMethod("findLength", Bullet.class, float.class, boolean.class, int.class);
+         } catch (Throwable ignored) {
+         }
+      }
+      try {
+         if (pierceLength != null) return Mathf.clamp((Float)pierceLength.invoke(null, b, this.pierceCap, len), 0.0F, len);
+      } catch (Throwable t) {
+         pierceLength = null;
+      }
+      try {
+         if (findLength != null) return Mathf.clamp((Float)findLength.invoke(null, b, len, false, this.pierceCap), 0.0F, len);
+      } catch (Throwable t) {
+         findLength = null;
+      }
+      return rayLength(b, len);
+   }
+
+   /** Own measurement, used when the engine one is not available: the beam ends at the first enemy building. */
+   static float rayLength(Bullet b, float len) {
+      float cos = Mathf.cosDeg(b.rotation()), sin = Mathf.sinDeg(b.rotation());
+      for (float d = 4.0F; d < len; d += 4.0F) {
+         Building bd = Vars.world.buildWorld(b.x + cos * d, b.y + sin * d);
+         if (bd != null && bd.team != b.team) return d;
+      }
+      return len;
    }
 
    /** Beam half width at the fraction t of its length: wide for most of it, then a smooth taper to a sharp point. */
