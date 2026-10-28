@@ -16,6 +16,7 @@ public class AnomalyModFixed extends AnomalyModGolden {
    public static Block laserBlock;
    public static Block dataBlock;
    public static Block decryptor;
+   public static Block absorber;
 
    public void loadContent() {
       super.loadContent();
@@ -39,6 +40,12 @@ public class AnomalyModFixed extends AnomalyModGolden {
          decryptor = new DecryptorBlock("decryptor");
       } catch (Throwable var3) {
          Log.err(var3);
+      }
+
+      try {
+         absorber = new AnomalyAbsorber("anomaly-absorber");
+      } catch (Throwable var7) {
+         Log.err(var7);
       }
 
       try {

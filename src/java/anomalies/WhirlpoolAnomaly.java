@@ -1,6 +1,5 @@
 package anomalies;
 
-import arc.graphics.Blending;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
@@ -16,37 +15,34 @@ import mindustry.graphics.Drawf;
 import mindustry.world.Tile;
 
 /**
- * Whirlpool: like the Vortex ("Выверт"), but it only appears on liquid tiles. A ground or naval unit that comes
- * within reach is grabbed, spun down the funnel and thrown out at the end, and the whirlpool is gone.
+ * Whirlpool: like the Vortex ("Выверт"), but it only appears on liquid tiles. It looks like a small spot of white waves
+ * running around the centre (2x2 tiles). A ground or naval unit that comes within reach is grabbed, spun down the funnel
+ * and thrown out at the end, and the whirlpool is gone.
  * The capture logic only runs on the server / single player (like every other anomaly); the picture is drawn on every client.
  */
 public class WhirlpoolAnomaly extends Anomaly {
-   static final float R = 32.0F;
+   /** grab radius, world units */
+   static final float R = 10.0F;
+   /** radius of the picture: 2x2 tiles = 16 world units across */
+   static final float VIS = 8.0F;
    static final float SPIRAL_TICKS = 100.0F;
-   static final int FOAM = 40;
+   /** rings of waves: radius, number of waves, length of a wave in degrees, speed in degrees per tick (clockwise, the inner rings are faster) */
+   static final float[] RING_R = {1.8F, 3.6F, 5.4F};
+   static final int[] RING_N = {2, 3, 4};
+   static final float[] RING_LEN = {100.0F, 80.0F, 62.0F};
+   static final float[] RING_SPEED = {5.4F, 3.7F, 2.6F};
+   static final int SEGS = 9;
    static final Color deep = Color.valueOf("0d3b8c");
    static final Color mid = Color.valueOf("2f84e0");
    static final Color cyan = Color.valueOf("7fe3ff");
-   static final Color foam = Color.valueOf("e6f9ff");
-   final float[] dPh = new float[FOAM];
-   final float[] dAng = new float[FOAM];
-   final float[] dSp = new float[FOAM];
-   final float[] dSz = new float[FOAM];
+   static final Color foam = Color.valueOf("f2fcff");
    Unit target;
    float startR;
    float phase;
    float angle;
 
    public WhirlpoolAnomaly() {
-      this.tileRadius = 2;
-
-      for(int i = 0; i < FOAM; ++i) {
-         this.dPh[i] = Mathf.random();
-         this.dAng[i] = Mathf.random(360.0F);
-         this.dSp[i] = Mathf.random(0.7F, 1.4F);
-         this.dSz[i] = Mathf.random(0.8F, 2.0F);
-      }
-
+      this.tileRadius = 1;
    }
 
    public Color color() {
@@ -111,59 +107,42 @@ public class WhirlpoolAnomaly extends Anomaly {
       float f = this.fade();
       float t = Time.time;
 
-      // water disc and rim
-      Draw.color(mid, 0.10F * f);
-      Fill.circle(this.x, this.y, R);
-      Lines.stroke(1.2F);
-      Draw.color(cyan, 0.18F * f);
-      Lines.circle(this.x, this.y, R);
+      // only white waves, no pool: small curved crests with a wavy edge, running clockwise around the centre (2x2 tiles)
+      for(int ring = 0; ring < RING_R.length; ++ring) {
+         for(int j = 0; j < RING_N[ring]; ++j) {
+            float head = ring * 41.0F + j * (360.0F / RING_N[ring]) - t * RING_SPEED[ring];
+            float breathe = 0.3F * Mathf.sin(t * 0.05F + ring * 1.9F + j * 2.3F);
+            float px = 0.0F, py = 0.0F;
 
-      // dark funnel: concentric rings that get darker towards the middle
-      for(int i = 0; i < 4; ++i) {
-         float k = (float)(i + 1) / 4.0F;
-         Draw.color(deep, (0.55F - 0.38F * k) * f);
-         Fill.circle(this.x, this.y, R * 0.62F * k);
-      }
+            for(int i = 0; i <= SEGS; ++i) {
+               float k = (float)i / SEGS; // 0 = head, 1 = tail
+               float a = head + k * RING_LEN[ring]; // the tail trails behind the head
+               // the crest itself ripples (a small wave along the wave), and its tail drifts outwards like a piece of a spiral
+               float rr = RING_R[ring] + breathe + k * 0.8F + 0.35F * Mathf.sin(k * 9.0F - t * 0.18F + j * 1.7F);
+               float qx = this.x + Mathf.cosDeg(a) * rr;
+               float qy = this.y + Mathf.sinDeg(a) * rr;
+               if (i > 0) {
+                  float al = (1.0F - k) * (1.0F - k * 0.3F);
+                  // soft wide underlay, then a bright white core
+                  Lines.stroke(1.5F + 1.2F * (1.0F - k));
+                  Draw.color(foam, (0.06F + 0.16F * al) * f);
+                  Lines.line(px, py, qx, qy);
+                  Lines.stroke(0.7F + 0.9F * (1.0F - k));
+                  Draw.color(Color.white, (0.15F + 0.85F * al) * f);
+                  Lines.line(px, py, qx, qy);
+               }
 
-      Draw.blend(Blending.additive);
-      // four spiral arms turning clockwise and curling into the centre
-      for(int arm = 0; arm < 4; ++arm) {
-         float a0 = (float)arm * 90.0F - t * 2.6F;
-         float px = this.x + Mathf.cosDeg(a0) * R;
-         float py = this.y + Mathf.sinDeg(a0) * R;
+               px = qx;
+               py = qy;
+            }
 
-         for(int i = 1; i <= 16; ++i) {
-            float k = (float)i / 16.0F;
-            float a = a0 + k * 240.0F;
-            float rr = R * (1.0F - k);
-            float qx = this.x + Mathf.cosDeg(a) * rr;
-            float qy = this.y + Mathf.sinDeg(a) * rr;
-            Lines.stroke(2.4F * (1.0F - 0.5F * k));
-            Draw.color(i % 2 == 0 ? cyan : mid, 0.34F * f * (0.35F + 0.65F * k));
-            Lines.line(px, py, qx, qy);
-            px = qx;
-            py = qy;
+            // a tiny foam bead at the head of every crest
+            Draw.color(Color.white, 0.9F * f);
+            Fill.circle(this.x + Mathf.cosDeg(head) * (RING_R[ring] + breathe), this.y + Mathf.sinDeg(head) * (RING_R[ring] + breathe), 0.7F);
          }
       }
 
-      // foam flecks sliding down the spiral
-      for(int i = 0; i < FOAM; ++i) {
-         float p = (t * 0.007F * this.dSp[i] + this.dPh[i]) % 1.0F;
-         float rr = 3.0F + (R - 3.0F) * (1.0F - p);
-         float a = this.dAng[i] + p * 400.0F + t * 0.9F;
-         float al = f * Mathf.clamp(p * 6.0F) * Mathf.clamp((1.0F - p) * 3.0F);
-         Draw.color(foam, 0.9F * al);
-         Fill.circle(this.x + Mathf.cosDeg(a) * rr, this.y + Mathf.sinDeg(a) * rr, this.dSz[i] * (0.5F + (1.0F - p) * 0.5F));
-      }
-
-      // bright eye
-      float pulse = 0.85F + 0.15F * Mathf.sin(t / 6.0F);
-      Draw.color(cyan, 0.45F * f * pulse);
-      Fill.circle(this.x, this.y, 6.0F);
-      Draw.color(foam, 0.9F * f);
-      Fill.circle(this.x, this.y, 2.0F + Mathf.absin(t, 7.0F, 0.8F));
-      Draw.blend();
-      Drawf.light(this.x, this.y, 44.0F, mid, 0.3F * f);
+      Drawf.light(this.x, this.y, 22.0F, cyan, 0.12F * f);
       Draw.reset();
    }
 }

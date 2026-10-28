@@ -69,6 +69,11 @@ public class OphanCore extends CoreBlock {
       Draw.scl(scl);
       Draw.color();
       Draw.rect(this.region, x, y, rotation - 45.0F);
+      // the team lines and the outline appear in the team colour while the core comes down
+      if (this.teamRegion != null && this.teamRegion.found()) {
+         Draw.color(build.team.color, Interp.pow5In.apply(1.0F - fout));
+         Draw.rect(this.teamRegion, x, y, rotation - 45.0F);
+      }
       Draw.scl();
       Draw.reset();
    }

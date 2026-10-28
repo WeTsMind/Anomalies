@@ -55,7 +55,7 @@ public class ToxicAnomaly extends Anomaly {
       float var1 = this.fade();
       float var2 = Time.time;
       Draw.blend();
-      Draw.z(39.9F);
+      Draw.z(Layer.scorch - 1.0F); // on the floor: below decals, shadows, static walls and every block
       Draw.color(sludge, 0.9F * var1);
       Fill.circle(this.x, this.y, 12.8F);
 
@@ -76,7 +76,7 @@ public class ToxicAnomaly extends Anomaly {
          Fill.circle(var12, var6, (0.4F + var10 * 1.1F) * 3.5555556F);
       }
 
-      Draw.z(Layer.effect);
+      Draw.z(Layer.scorch - 0.5F); // the rising puffs too: everything of the toxic is under the blocks
 
       for(int var9 = 0; var9 < 8; ++var9) {
          float var11 = (var2 * 0.007F + hash(var9 + 20)) % 1.0F;

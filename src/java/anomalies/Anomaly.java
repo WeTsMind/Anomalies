@@ -11,6 +11,8 @@ public abstract class Anomaly {
    public float life = 3600.0F;
    public int tileRadius = 2;
    public boolean dead;
+   /** Permanent anomalies cannot be absorbed by the Anomaly Absorber. */
+   public boolean permanent;
 
    public abstract Color color();
 
