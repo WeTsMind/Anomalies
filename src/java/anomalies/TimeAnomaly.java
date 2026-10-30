@@ -76,6 +76,7 @@ public class TimeAnomaly extends Anomaly {
    }
 
    public void draw() {
+      AnomalyShaders.distort(this.x, this.y, 12.0F, this.fade(), AnomalyShaders.TIME, 110.0F);
       float var1 = this.fade();
       float var2 = 0.6F + Mathf.absin(Time.time, 16.0F, 0.4F);
 

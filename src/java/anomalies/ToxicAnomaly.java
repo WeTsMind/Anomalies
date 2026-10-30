@@ -52,6 +52,7 @@ public class ToxicAnomaly extends Anomaly {
    }
 
    public void draw() {
+      AnomalyShaders.distort(this.x, this.y, 14.0F, this.fade(), AnomalyShaders.TOXIC, 9.0F); // on the floor, under blocks like the puddle itself
       float var1 = this.fade();
       float var2 = Time.time;
       Draw.blend();

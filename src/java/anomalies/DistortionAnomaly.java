@@ -85,11 +85,8 @@ public class DistortionAnomaly extends Anomaly {
       float var2 = Time.time;
       boolean fx = AnomalyShaders.usable();
       if (fx) {
-         // real space distortion: re-draw the frame behind the anomaly through the lens shader
-         final float cx = this.x;
-         final float cy = this.y;
-         final float f = var1;
-         Draw.draw(110.0F, () -> AnomalyShaders.drawDistortion(cx, cy, 18.0F, f));
+         // real space distortion behind the anomaly; its own drawing stays on top
+         AnomalyShaders.distort(this.x, this.y, 18.0F, var1, AnomalyShaders.BARRIER, 110.0F);
          Draw.z(110.01F);
       }
 

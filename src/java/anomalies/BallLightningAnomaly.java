@@ -182,6 +182,7 @@ public class BallLightningAnomaly extends Anomaly {
    }
 
    public void draw() {
+      AnomalyShaders.distort(this.x, this.y, this.half, this.fade(), AnomalyShaders.BALL, 110.0F);
       float var1 = this.fade();
       float var2 = Time.time;
       float var3 = 0.8F + 0.2F * (float)Math.sin((double)(var2 * 0.3F));

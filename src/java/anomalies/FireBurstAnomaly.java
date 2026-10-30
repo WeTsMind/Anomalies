@@ -102,6 +102,7 @@ public class FireBurstAnomaly extends Anomaly {
    }
 
    public void draw() {
+      AnomalyShaders.distort(this.x, this.y, 16.0F, this.fade(), AnomalyShaders.FIRE, 39.9F);
       float var1 = this.fade();
       float var2 = Time.time;
       Draw.z(39.9F);

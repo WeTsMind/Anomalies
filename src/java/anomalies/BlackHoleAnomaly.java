@@ -345,6 +345,7 @@ public class BlackHoleAnomaly extends Anomaly {
    }
 
    public void draw() {
+      AnomalyShaders.distort(this.x, this.y, 14.0F + 8.0F * Math.max(0.0F, Math.min(1.0F, (this.age - 9000.0F) / 1800.0F)), this.fade(), AnomalyShaders.BLACKHOLE, 89.0F);
       float var1 = this.fade();
       float var2 = Time.time;
       float var3 = this.age >= 10800.0F ? Math.min(1.0F, (this.age - 10800.0F) / 180.0F) : 0.0F;

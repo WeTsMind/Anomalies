@@ -212,6 +212,7 @@ public class WarpAnomaly extends Anomaly {
    }
 
    public void draw() {
+      AnomalyShaders.distort(this.x, this.y, 22.0F * this.s, this.fade(), AnomalyShaders.WARP, 88.0F);
       float var1 = this.fade();
       float var2 = Time.time;
       float var3 = 11.5F * this.s;

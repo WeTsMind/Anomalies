@@ -104,6 +104,7 @@ public class WhirlpoolAnomaly extends Anomaly {
    }
 
    public void draw() {
+      AnomalyShaders.distort(this.x, this.y, 10.0F, this.fade(), AnomalyShaders.WHIRLPOOL, 110.0F);
       float f = this.fade();
       float t = Time.time;
 
