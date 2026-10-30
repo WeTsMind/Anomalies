@@ -133,6 +133,7 @@ public class AnomalyShaders {
    static FrameBuffer screen;
    static long frameId = -1L;
    static int passes;
+   static boolean announced;
    /** Hard cap of shader passes per frame (each one copies the screen). */
    static final int MAX_PASSES = 8;
 
@@ -230,11 +231,17 @@ public class AnomalyShaders {
          float ext = radius + 2.0F;
          Fill.rect(cx, cy, ext * 2.0F, ext * 2.0F);
          Draw.shader();
+         if (!announced) {
+            announced = true;
+            Core.app.post(() -> Vars.ui.showInfoToast("[lime]Anomalies: distortion pass is running[]", 6.0F));
+         }
       } catch (Throwable var12) {
          Log.err("Anomalies: distortion pass failed, disabling it", var12);
          Draw.shader();
          status = "draw pass failed: " + var12;
          distort = null;
+         final String msg = status;
+         Core.app.post(() -> Vars.ui.showInfoToast("[scarlet]Anomalies: distortion shader error[]\n" + msg, 15.0F));
       }
    }
 
@@ -270,25 +277,46 @@ public class AnomalyShaders {
          super(VERT, FRAG);
       }
 
+      void f1(String n, float a) {
+         if (this.hasUniform(n)) {
+            this.setUniformf(n, a);
+         }
+      }
+
+      void f2(String n, float a, float b) {
+         if (this.hasUniform(n)) {
+            this.setUniformf(n, a, b);
+         }
+      }
+
+      void f4(String n, float a, float b, float c, float d) {
+         if (this.hasUniform(n)) {
+            this.setUniformf(n, a, b, c, d);
+         }
+      }
+
       public void apply() {
          float camW = Core.camera.width;
          float camH = Core.camera.height;
          float left = Core.camera.position.x - camW / 2.0F;
          float bottom = Core.camera.position.y - camH / 2.0F;
          Style st = this.style;
-         this.setUniformf("u_center", this.cx, this.cy);
-         this.setUniformf("u_uvCenter", (this.cx - left) / camW, (this.cy - bottom) / camH);
-         this.setUniformf("u_uvScale", 1.0F / camW, 1.0F / camH);
-         this.setUniformf("u_radius", this.radius);
-         this.setUniformf("u_time", Time.time % 62831.85F);
-         this.setUniformf("u_fade", this.fade);
-         this.setUniformf("u_a", st.lens, st.swirl, st.swirlSpeed, st.aberration);
-         this.setUniformf("u_b", st.rippleAmp, st.rippleFreq, st.rippleSpeed, st.arms);
-         this.setUniformf("u_c", st.shatter, st.shatterCell, st.rim, st.dark);
-         this.setUniformf("u_tint", st.r, st.g, st.b, st.tint);
-         this.setUniformf("u_box", this.hw, this.hh, this.c, this.s);
+         this.f2("u_center", this.cx, this.cy);
+         this.f2("u_uvCenter", (this.cx - left) / camW, (this.cy - bottom) / camH);
+         this.f2("u_uvScale", 1.0F / camW, 1.0F / camH);
+         this.f1("u_radius", this.radius);
+         this.f1("u_time", Time.time % 62831.85F);
+         this.f1("u_fade", this.fade);
+         this.f4("u_a", st.lens, st.swirl, st.swirlSpeed, st.aberration);
+         this.f4("u_b", st.rippleAmp, st.rippleFreq, st.rippleSpeed, st.arms);
+         this.f4("u_c", st.shatter, st.shatterCell, st.rim, st.dark);
+         this.f4("u_tint", st.r, st.g, st.b, st.tint);
+         this.f4("u_box", this.hw, this.hh, this.c, this.s);
          AnomalyShaders.screen.getTexture().bind(1);
-         this.setUniformi("u_screen", 1);
+         if (this.hasUniform("u_screen")) {
+            this.setUniformi("u_screen", 1);
+         }
+
          Gl.activeTexture(Gl.texture0);
       }
    }
