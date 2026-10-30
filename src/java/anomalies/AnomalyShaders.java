@@ -33,20 +33,12 @@ public class AnomalyShaders {
       + "  gl_Position = u_projTrans * a_position;\n"
       + "}\n";
 
-   static final String FRAG = "#ifdef GL_ES\n"
-      + "precision mediump float;\n"
-      + "precision mediump int;\n"
-      + "#endif\n"
-      + "#ifdef GL_FRAGMENT_PRECISION_HIGH\n"
-      + "#define HP highp\n"
-      + "#else\n"
-      + "#define HP mediump\n"
-      + "#endif\n"
-      + "uniform sampler2D u_screen;\n"
+   // no GL_ES / precision lines here: arc's preprocessor adds them itself and rejects shaders that contain them
+   static final String FRAG = "uniform sampler2D u_screen;\n"
       + "uniform vec2 u_uvCenter;\n"
       + "uniform vec2 u_uvScale;\n"
       + "uniform float u_radius;\n"
-      + "uniform HP float u_time;\n"
+      + "uniform highp float u_time;\n"
       + "uniform float u_fade;\n"
       + "uniform vec4 u_a;\n"      // lens, swirl, swirlSpeed, aberration
       + "uniform vec4 u_b;\n"      // rippleAmp, rippleFreq, rippleSpeed, spiralArms
