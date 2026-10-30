@@ -83,7 +83,17 @@ public class DistortionAnomaly extends Anomaly {
    public void draw() {
       float var1 = this.fade();
       float var2 = Time.time;
-      Draw.color(violet, 0.14F * var1);
+      boolean fx = AnomalyShaders.usable();
+      if (fx) {
+         // real space distortion: re-draw the frame behind the anomaly through the lens shader
+         final float cx = this.x;
+         final float cy = this.y;
+         final float f = var1;
+         Draw.draw(110.0F, () -> AnomalyShaders.drawDistortion(cx, cy, 18.0F, f));
+         Draw.z(110.01F);
+      }
+
+      Draw.color(violet, (fx ? 0.03F : 0.14F) * var1);
       Fill.circle(this.x, this.y, 16.0F);
       Draw.blend(Blending.additive);
 

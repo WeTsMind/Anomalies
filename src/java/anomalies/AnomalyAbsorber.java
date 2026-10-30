@@ -12,6 +12,7 @@ import arc.math.Mathf;
 import arc.util.Time;
 import mindustry.Vars;
 import mindustry.content.Items;
+import mindustry.game.Team;
 import mindustry.gen.Building;
 import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
@@ -21,9 +22,9 @@ import mindustry.world.Block;
 import mindustry.world.meta.BuildVisibility;
 
 /**
- * Anomaly Absorber: while powered, it picks the nearest enemy anomaly within 8 tiles and absorbs it with a beam (same look as the
- * Anomaly Hunter's beam) in 5 seconds. It never touches permanent anomalies, ball lightning of a turret, Alloy mirror shields
- * or anomalies of its own team.
+ * Anomaly Absorber: a turret-like block. While powered it turns towards the nearest enemy SHOT anomaly within 8 tiles (ball lightning of
+ * Anomaly Turret / Golden Ratio / Alloy / ArUx, and mirror shields of an enemy Alloy or rift projector), holds it with a beam
+ * (same look as the Anomaly Hunter's beam) and absorbs it in 5 seconds. Anomalies of its own team and permanent anomalies are ignored.
  */
 public class AnomalyAbsorber extends Block {
    static final Color glow = Color.valueOf("1f6bff");
@@ -56,6 +57,11 @@ public class AnomalyAbsorber extends Block {
       this.ringRegion = Core.atlas.find(this.name + "-ring");
    }
 
+   /** The build-menu icon: base plus the turret part, like turrets do. */
+   public TextureRegion[] icons() {
+      return new TextureRegion[]{this.region, this.ringRegion};
+   }
+
    public void drawPlace(int x, int y, int rotation, boolean valid) {
       super.drawPlace(x, y, rotation, valid);
       Drawf.dashCircle((float)x * 8.0F + this.offset, (float)y * 8.0F + this.offset, RANGE * 8.0F, mid);
@@ -67,47 +73,54 @@ public class AnomalyAbsorber extends Block {
       float ringRot;
       float heat;
       float scanTimer;
+      boolean held;
+      float hx;
+      float hy;
+      float hage;
 
       boolean active() {
          return this.power != null && this.power.status > 0.01F;
       }
 
-      /** Enemy anomalies only; permanent ones, turret ball lightning and Alloy mirror shields are never absorbed. */
+      /** Only enemy shot anomalies: ball lightning and team mirrors (e.g. the Alloy mirror shield); never permanent ones. */
       boolean valid(Anomaly a) {
-         if (a == null || a.dead || a.permanent || a.life - a.age < 60.0F) {
+         if (a == null || a.dead || a.permanent || a.life - a.age < 5.0F) {
             return false;
          }
 
-         if (a instanceof TurretBall || AlloyUnit.alloyMirrors.contains(a)) {
-            return false;
+         boolean enemy;
+         if (a instanceof TurretBall) {
+            enemy = ((TurretBall)a).team != this.team;
+         } else if (a instanceof MirrorAnomaly) {
+            Team t = ((MirrorAnomaly)a).team;
+            enemy = t != null && t != this.team;
+         } else {
+            enemy = false;
          }
 
-         if (a instanceof MirrorAnomaly && ((MirrorAnomaly)a).team != null && ((MirrorAnomaly)a).team == this.team) {
-            return false;
-         }
-
-         return Mathf.dst(this.x, this.y, a.x, a.y) <= RANGE * 8.0F;
+         return enemy && Mathf.dst(this.x, this.y, a.x, a.y) <= RANGE * 8.0F;
       }
 
       public void updateTile() {
          boolean on = this.active();
          this.heat = Mathf.lerpDelta(this.heat, on ? 1.0F : 0.0F, 0.04F);
          if (!on) {
+            this.held = false;
             this.target = null;
             this.beam = Math.max(0.0F, this.beam - Time.delta * 2.0F);
             return;
          }
 
          if (this.target != null && !this.valid(this.target)) {
+            this.held = false;
             this.target = null;
             this.beam = 0.0F;
          }
 
          if (this.target == null) {
             this.beam = Math.max(0.0F, this.beam - Time.delta * 2.0F);
-            this.ringRot += 0.6F * Time.delta;
             this.scanTimer += Time.delta;
-            if (this.scanTimer >= 10.0F) {
+            if (this.scanTimer >= 5.0F) {
                this.scanTimer = 0.0F;
                float best = Float.MAX_VALUE;
 
@@ -129,20 +142,32 @@ public class AnomalyAbsorber extends Block {
          this.ringRot = Angles.moveToward(this.ringRot, want, 7.0F * Time.delta);
          if (Angles.angleDist(this.ringRot, want) < 8.0F) {
             this.beam = Math.min(ABSORB_TIME, this.beam + Time.delta * Mathf.clamp(this.power.status));
+            if (this.target instanceof TurretBall) {
+               // the beam catches the ball: it hangs in place (so it neither flies away nor times out) and stops striking while absorbed
+               TurretBall ball = (TurretBall)this.target;
+               if (!this.held) {
+                  this.held = true;
+                  this.hx = ball.x;
+                  this.hy = ball.y;
+                  this.hage = ball.age;
+               }
+
+               ball.x = this.hx;
+               ball.y = this.hy;
+               ball.age = this.hage;
+               ball.cd = Math.max(ball.cd, 5.0F);
+            }
          } else {
             this.beam = Math.max(0.0F, this.beam - Time.delta * 2.0F);
          }
 
          if (this.beam >= ABSORB_TIME) {
             if (!Vars.net.client()) {
-               if (this.target instanceof MirrorAnomaly && ((MirrorAnomaly)this.target).team != null) {
-                  this.target.dead = true;
-               } else {
-                  this.target.life = Math.min(this.target.life, this.target.age + 40.0F);
-               }
+               this.target.dead = true;
             }
 
             AnomalyFx.pulse.at(this.target.x, this.target.y, (float)this.target.tileRadius * 8.0F + 8.0F, mid);
+            this.held = false;
             this.target = null;
             this.beam = 0.0F;
          }
