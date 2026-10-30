@@ -45,6 +45,7 @@ public class AnomalyShaders {
       + "uniform vec4 u_c;\n"      // shatter, shatterCell, rim, darkCenter
       + "uniform vec4 u_tint;\n"   // rgb, amount
       + "uniform vec4 u_box;\n"    // halfW, halfH, cos, sin (halfW <= 0: circle)
+      + "uniform float u_debug;\n"
       + "varying vec2 v_rel;\n"
       + "vec3 at(vec2 rel){ return texture2D(u_screen, u_uvCenter + rel * u_uvScale).rgb; }\n"
       + "void main(){\n"
@@ -60,6 +61,8 @@ public class AnomalyShaders {
       + "    dir = v_rel / max(len, 0.001);\n"
       + "  }\n"
       + "  if(r >= 1.0) discard;\n"
+      + "  if(u_debug > 0.5 && u_debug < 1.5){ gl_FragColor = vec4(0.8, 0.0, 0.8, 0.8); return; }\n"
+      + "  if(u_debug > 1.5){ gl_FragColor = vec4(at(v_rel) * vec3(0.5, 1.0, 0.5), 1.0); return; }\n"
       + "  float dist = r * u_radius;\n"
       + "  float edge = 1.0 - r;\n"
       + "  float core = edge * edge;\n"
@@ -84,7 +87,8 @@ public class AnomalyShaders {
       + "  col *= 1.0 - u_c.w * pow(core, 1.5);\n"
       + "  col = mix(col, u_tint.rgb, u_tint.a * core);\n"
       + "  col += u_tint.rgb * pow(r, 6.0) * u_c.z;\n"
-      + "  gl_FragColor = vec4(col, u_fade * smoothstep(1.0, 0.88, r));\n"
+      + "  float a = u_fade * smoothstep(1.0, 0.88, r);\n"
+      + "  gl_FragColor = vec4(col * a, a);\n"
       + "}\n";
 
    /** How one anomaly bends the picture. All numbers are tunable. */
@@ -150,6 +154,7 @@ public class AnomalyShaders {
          try {
             // the on/off switch lives in Settings -> Graphics (client-side, default on)
             Vars.ui.settings.graphics.checkPref("anom-shader", true);
+            Vars.ui.settings.graphics.sliderPref("anom-shader-debug", 0, 0, 2, 1, v -> v == 0 ? "off" : (v == 1 ? "magenta disc" : "unwarped copy (green)"));
          } catch (Throwable var3) {
             Log.err(var3);
          }
@@ -304,6 +309,7 @@ public class AnomalyShaders {
          this.f4("u_c", st.shatter, st.shatterCell, st.rim, st.dark);
          this.f4("u_tint", st.r, st.g, st.b, st.tint);
          this.f4("u_box", this.hw, this.hh, this.c, this.s);
+         this.f1("u_debug", (float)Core.settings.getInt("anom-shader-debug", 0));
          AnomalyShaders.screen.getTexture().bind(1);
          if (this.hasUniform("u_screen")) {
             this.setUniformi("u_screen", 1);
