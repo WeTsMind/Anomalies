@@ -87,32 +87,7 @@ public class DistortionAnomaly extends Anomaly {
       if (fx) {
          // real space distortion behind the anomaly; its own drawing stays on top
          AnomalyShaders.distort(this.x, this.y, 18.0F, var1, AnomalyShaders.BARRIER, 88.0F);
-         Draw.z(110.01F);
-         // barrier look: no loud rings, only a soft pale halo and faint streaks swirling around the rim
-         Draw.blend(Blending.additive);
-
-         for(int k = 0; k < 3; ++k) {
-            Lines.stroke(5.0F - (float)k * 1.6F);
-            Draw.color(Color.white, var1 * (0.05F + 0.04F * (float)k));
-            Lines.circle(this.x, this.y, 16.5F);
-         }
-
-         for(int i = 0; i < 6; ++i) {
-            float a0 = (float)i * 60.0F + var2 * 1.2F;
-            float rr = 15.5F + 1.2F * Mathf.sinDeg((float)i * 120.0F + var2 * 1.7F);
-
-            for(int j = 0; j < 10; ++j) {
-               float a1 = a0 + (float)j * 3.2F;
-               float a2 = a1 + 3.2F;
-               float k = 1.0F - (float)j / 10.0F;
-               Lines.stroke(1.1F * k + 0.2F);
-               Draw.color(Color.white, var1 * 0.35F * k);
-               Lines.line(this.x + Mathf.cosDeg(a1) * rr, this.y + Mathf.sinDeg(a1) * rr, this.x + Mathf.cosDeg(a2) * rr, this.y + Mathf.sinDeg(a2) * rr);
-            }
-         }
-
-         Draw.blend();
-         Drawf.light(this.x, this.y, 40.0F, pale, 0.15F * var1);
+         // barrier look: no border at all, the zone is only the distortion itself
          Draw.reset();
          return;
       }

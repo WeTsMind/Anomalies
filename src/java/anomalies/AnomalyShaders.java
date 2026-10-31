@@ -111,24 +111,28 @@ public class AnomalyShaders {
       + "  col = mix(col, u_tint.rgb, u_tint.a * core);\n"
       + "  col += u_tint.rgb * pow(r, 6.0) * u_c.z;\n"
       + "  col *= 1.0 - u_g.w * smoothstep(0.55, 1.0, r);\n"
-      + "  col *= 1.0 + u_h.x * dot(v_rel / u_radius, vec2(-0.5, 0.65)) * (0.4 + r);\n"
-      + "  float a = u_g.y * u_fade * (1.0 - smoothstep(0.88, 1.0, r));\n"
+      + "  col *= 1.0 + u_h.x * dot(v_rel / u_radius, vec2(-0.5, 0.65)) * (1.0 - r) * 2.0;\n"
+      + "  float a = u_g.y * u_fade * (1.0 - smoothstep(0.7, 1.0, r));\n"
       + "  gl_FragColor = vec4(col, a);\n"
       + "}\n";
 
-   /** Shattered-mirror look: the outline of the anomaly is cut into glass triangles, each one a small convex lens. No glow at all. */
+   /**
+    * Broken-mirror rift: a jagged outline (the anomaly's own shape) filled with irregular shards of different sizes. Every shard shows
+    * its own piece of the scene (a convex lens, a few concave, tilted, shifted, some flipped, some "deep" and dark), separated by dark
+    * cracks of different widths, with a few long cracks running across several shards. No glow.
+    */
    static final String FRAG_MIRROR = "uniform sampler2D u_screen;\n"
       + "uniform vec2 u_uvCenter;\n"
       + "uniform vec2 u_uvScale;\n"
       + "uniform highp float u_time;\n"
       + "uniform float u_fade;\n"
-      + "uniform vec2 u_size;\n"      // halfW, halfH of the anomaly
-      + "uniform vec2 u_rot;\n"       // cos, sin of its rotation
-      + "uniform vec3 u_rip0;\n"      // recent hits: x, y (world axes, relative to the centre), age in ticks
+      + "uniform vec2 u_size;\n"
+      + "uniform vec2 u_rot;\n"
+      + "uniform vec3 u_rip0;\n"
       + "uniform vec3 u_rip1;\n"
       + "uniform vec3 u_rip2;\n"
       + "uniform vec3 u_rip3;\n"
-      + "uniform float u_lw[15];\n"   // left / right half widths along the length (the real outline of the anomaly)
+      + "uniform float u_lw[15];\n"
       + "uniform float u_rw[15];\n"
       + "varying vec2 v_rel;\n"
       + "vec2 hash2(vec2 p){\n"
@@ -155,38 +159,75 @@ public class AnomalyShaders {
       + "  }\n"
       + "  return s;\n"
       + "}\n"
+      + "void voro(vec2 p, float jit, out vec2 id, out vec2 r0, out float edgeD){\n"
+      + "  vec2 ip = floor(p);\n"
+      + "  vec2 fp = fract(p);\n"
+      + "  float md = 8.0;\n"
+      + "  vec2 g0 = vec2(0.0);\n"
+      + "  r0 = vec2(0.0);\n"
+      + "  for(int j = -1; j <= 1; j++){\n"
+      + "    for(int i = -1; i <= 1; i++){\n"
+      + "      vec2 g = vec2(float(i), float(j));\n"
+      + "      vec2 o = 0.5 + jit * sin(u_time * 0.01 + 6.2831 * hash2(ip + g));\n"
+      + "      vec2 r = g + o - fp;\n"
+      + "      float dd = dot(r, r);\n"
+      + "      if(dd < md){ md = dd; r0 = r; g0 = g; }\n"
+      + "    }\n"
+      + "  }\n"
+      + "  edgeD = 8.0;\n"
+      + "  for(int j = -1; j <= 1; j++){\n"
+      + "    for(int i = -1; i <= 1; i++){\n"
+      + "      vec2 g = vec2(float(i), float(j));\n"
+      + "      vec2 o = 0.5 + jit * sin(u_time * 0.01 + 6.2831 * hash2(ip + g));\n"
+      + "      vec2 r = g + o - fp;\n"
+      + "      vec2 df = r - r0;\n"
+      + "      if(dot(df, df) > 0.00001){ edgeD = min(edgeD, dot(0.5 * (r0 + r), normalize(df))); }\n"
+      + "    }\n"
+      + "  }\n"
+      + "  id = ip + g0;\n"
+      + "}\n"
       + "void main(){\n"
       + "  vec2 q = vec2(u_rot.x * v_rel.x + u_rot.y * v_rel.y, -u_rot.y * v_rel.x + u_rot.x * v_rel.y);\n"
       + "  float t = (q.y + u_size.y) / (2.0 * u_size.y);\n"
       + "  if(t < 0.0 || t > 1.0) discard;\n"
       + "  float w = prof(t, q.x < 0.0);\n"
       + "  float d = w - abs(q.x);\n"
+      + "  d += 0.55 * (1.1 * sin(q.y * 0.85 + 1.7 * sin(q.x * 0.6)) + 0.7 * sin(q.y * 2.3 + q.x * 1.1));\n"
       + "  if(d <= 0.0) discard;\n"
       + "  vec2 qs = q + rip(u_rip0, q) + rip(u_rip1, q) + rip(u_rip2, q) + rip(u_rip3, q);\n"
-      + "  float cellS = u_size.x * 0.65;\n"
-      + "  vec2 p = qs / cellS;\n"
-      + "  p += 0.22 * vec2(sin(p.y * 1.7 + 1.3), sin(p.x * 1.9 + 0.7)) + 0.05 * vec2(sin(u_time * 0.01 + p.y), cos(u_time * 0.011 + p.x));\n"
-      + "  vec2 sk = p + (p.x + p.y) * 0.366025;\n"
-      + "  vec2 i = floor(sk);\n"
-      + "  vec2 f = sk - i;\n"
-      + "  bool lower = f.x > f.y;\n"
-      + "  vec2 cs = i + (lower ? vec2(0.66667, 0.33333) : vec2(0.33333, 0.66667));\n"
-      + "  vec2 c = cs - (cs.x + cs.y) * 0.211325;\n"
-      + "  float edge = lower ? min(f.y, min(1.0 - f.x, f.x - f.y)) : min(f.x, min(1.0 - f.y, f.y - f.x));\n"
-      + "  vec2 h = hash2(i + (lower ? 0.0 : 31.7));\n"
-      + "  vec2 rel = p - c;\n"
-      + "  float tt = min(length(rel) / 0.48, 1.0);\n"
-      + "  float k = mix(0.5, 0.78, h.x) + 0.05 * sin(u_time * 0.03 + h.y * 6.2831);\n"
-      + "  vec2 srcL = qs + rel * (mix(k, 1.0, tt * tt) - 1.0) * cellS + (h - 0.5) * 0.25 * cellS;\n"
+      + "  float cellS = u_size.x * 0.7 / (1.0 + 0.45 * sin(q.y * 0.07 + 0.8));\n"
+      + "  vec2 p = qs / cellS + 0.2 * vec2(sin(qs.y * 0.11), sin(qs.x * 0.13));\n"
+      + "  vec2 id;\n"
+      + "  vec2 r0;\n"
+      + "  float edgeD;\n"
+      + "  voro(p, 0.42, id, r0, edgeD);\n"
+      + "  edgeD *= cellS;\n"
+      + "  vec2 h = hash2(id);\n"
+      + "  vec2 h2 = hash2(id + 17.3);\n"
+      + "  vec2 h3 = hash2(id + 41.9);\n"
+      + "  vec2 rel = -r0 * cellS;\n"
+      + "  float kk = h.x < 0.8 ? mix(0.45, 0.85, h.y) : mix(1.1, 1.5, h.y);\n"
+      + "  float tt = min(length(rel) / (0.5 * cellS), 1.0);\n"
+      + "  float ang = (h2.x - 0.5) * 0.9 + 0.2 * sin(u_time * 0.012 + h.y * 6.2831);\n"
+      + "  vec2 rr = vec2(cos(ang) * rel.x - sin(ang) * rel.y, sin(ang) * rel.x + cos(ang) * rel.y);\n"
+      + "  if(h2.y > 0.6) rr.x = -rr.x;\n"
+      + "  vec2 drift = vec2(sin(u_time * 0.01 + h.x * 6.2831), cos(u_time * 0.012 + h.y * 6.2831)) * 0.4 * cellS * step(0.7, h3.x);\n"
+      + "  vec2 srcL = qs + (rr * mix(kk, 1.0, tt * tt) - rel) + (h3 - 0.5) * 0.7 * cellS + drift;\n"
       + "  vec2 srcW = vec2(u_rot.x * srcL.x - u_rot.y * srcL.y, u_rot.y * srcL.x + u_rot.x * srcL.y);\n"
       + "  vec3 col = at(srcW);\n"
-      + "  col *= vec3(0.82, 0.93, 1.0);\n"
-      + "  col *= 1.0 + 0.3 * dot(rel / 0.48, vec2(-0.6, 0.8)) * (0.6 + 0.4 * h.x);\n"
-      + "  col *= 0.9 + 0.2 * h.y;\n"
-      + "  col *= 1.0 - 0.5 * (1.0 - smoothstep(0.0, 0.12, edge));\n"
-      + "  col *= 1.0 - 0.4 * (1.0 - smoothstep(0.0, 1.2, d));\n"
-      + "  float a = u_fade * smoothstep(0.0, 0.6, d);\n"
-      + "  gl_FragColor = vec4(col, a);\n"
+      + "  col *= mix(vec3(0.8, 0.92, 1.0), vec3(1.0), h3.y * 0.5);\n"
+      + "  col *= 0.82 + 0.3 * h.y + 0.25 * dot(rel / (0.5 * cellS), vec2(-0.6, 0.8)) * (0.5 + 0.5 * h2.x) + 0.12 * sin(u_time * 0.03 + h3.x * 6.2831);\n"
+      + "  col = mix(col, col * vec3(0.35, 0.5, 0.7), step(0.88, h3.y) * 0.8);\n"
+      + "  float crack = 1.0 - smoothstep(0.0, 0.25 + 0.5 * h2.y, edgeD);\n"
+      + "  col = mix(col, vec3(0.03, 0.05, 0.09), crack * 0.85);\n"
+      + "  vec2 id2;\n"
+      + "  vec2 r2;\n"
+      + "  float e2;\n"
+      + "  voro(qs / (cellS * 3.2) + vec2(7.3, 2.1), 0.35, id2, r2, e2);\n"
+      + "  e2 *= cellS * 3.2;\n"
+      + "  col *= 1.0 - 0.55 * (1.0 - smoothstep(0.0, 0.35, e2));\n"
+      + "  col *= 1.0 - 0.5 * (1.0 - smoothstep(0.0, 1.0, d));\n"
+      + "  gl_FragColor = vec4(col, u_fade * smoothstep(0.0, 0.5, d));\n"
       + "}\n";
 
    /** How one anomaly bends the picture. All numbers are tunable. */
@@ -234,7 +275,7 @@ public class AnomalyShaders {
    }
 
    // barrier: a smooth convex bubble that magnifies the picture and drains the colours inside it
-   public static final Style BARRIER = new Style().lens(0.3F).edgeLens(1.8F).vignette(0.3F).bevel(0.35F).swirl(0.35F, 0.02F).aberration(0.04F).tint(1.0F, 1.0F, 1.0F, 0.08F).rim(0.12F).desat(1.0F);
+   public static final Style BARRIER = new Style().lens(0.3F).bevel(0.3F).swirl(0.35F, 0.02F).aberration(0.04F).tint(1.0F, 1.0F, 1.0F, 0.08F).desat(1.0F);
    public static final Style TIME = new Style().lens(0.8F).swirl(0.4F, 0.02F).ripple(0.8F, 0.9F, 0.15F, 0.0F).aberration(0.09F).shatter(2.4F, 3.0F).tint(0.55F, 1.0F, 0.8F, 0.12F).rim(0.3F);
    public static final Style VORTEX = new Style().lens(1.0F).swirl(2.6F, 0.02F).ripple(1.0F, 0.4F, 0.1F, 3.0F).aberration(0.03F).tint(0.7F, 0.8F, 1.0F, 0.05F).rim(0.1F);
    // black hole: the surroundings are twisted and smeared into arcs around the centre (a negative swirl speed = steady twist)
@@ -256,8 +297,8 @@ public class AnomalyShaders {
    static long frameId = -1L;
    static int passes;
    static boolean announced;
-   /** Hard cap of shader passes per frame (each one copies the screen). */
-   static final int MAX_PASSES = 8;
+   /** Cap of shader passes per frame (each one copies the screen); a graphics setting, 24 by default. */
+   static int maxPasses = 24;
 
    public static void load() {
       if (Vars.headless) {
@@ -286,6 +327,7 @@ public class AnomalyShaders {
          try {
             // the on/off switch lives in Settings -> Graphics (client-side, default on)
             Vars.ui.settings.graphics.checkPref("anom-shader", true);
+            Vars.ui.settings.graphics.sliderPref("anom-shader-passes", 24, 4, 60, 2, i -> String.valueOf(i));
          } catch (Throwable var3) {
             Log.err(var3);
          }
@@ -354,9 +396,10 @@ public class AnomalyShaders {
       if (id != frameId) {
          frameId = id;
          passes = 0;
+         maxPasses = Core.settings.getInt("anom-shader-passes", 24);
       }
 
-      if (++passes > MAX_PASSES) {
+      if (++passes > maxPasses) {
          return;
       }
 
@@ -395,9 +438,10 @@ public class AnomalyShaders {
       if (id != frameId) {
          frameId = id;
          passes = 0;
+         maxPasses = Core.settings.getInt("anom-shader-passes", 24);
       }
 
-      if (++passes > MAX_PASSES) {
+      if (++passes > maxPasses) {
          return;
       }
 
