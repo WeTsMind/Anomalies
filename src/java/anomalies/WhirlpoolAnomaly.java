@@ -106,6 +106,9 @@ public class WhirlpoolAnomaly extends Anomaly {
    public void draw() {
       AnomalyShaders.distort(this.x, this.y, 10.0F, this.fade(), AnomalyShaders.WHIRLPOOL, 110.0F);
       float f = this.fade();
+      if (AnomalyShaders.usable()) {
+         f *= 0.7F; // semi-transparent: the twisted liquid underneath must stay visible
+      }
       float t = Time.time;
 
       // only white waves, no pool: small curved crests with a wavy edge, running clockwise around the centre (2x2 tiles)

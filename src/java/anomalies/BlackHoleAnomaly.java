@@ -37,6 +37,9 @@ public class BlackHoleAnomaly extends Anomaly {
    static final Color soft = Color.valueOf("fff3d6");
    static final Color white = Color.valueOf("ffffff");
    static final Color black = Color.valueOf("000000");
+   static final Color orange = Color.valueOf("ff8a1f");
+   static final Color orangeDeep = Color.valueOf("e8590c");
+   static final Color orangeHot = Color.valueOf("ffc27a");
    final float[] bx;
    final float[] by;
    final float[] bs;
@@ -345,12 +348,16 @@ public class BlackHoleAnomaly extends Anomaly {
    }
 
    public void draw() {
-      AnomalyShaders.distort(this.x, this.y, 14.0F + 8.0F * Math.max(0.0F, Math.min(1.0F, (this.age - 9000.0F) / 1800.0F)), this.fade(), AnomalyShaders.BLACKHOLE, 89.0F);
       float var1 = this.fade();
       float var2 = Time.time;
       float var3 = this.age >= 10800.0F ? Math.min(1.0F, (this.age - 10800.0F) / 180.0F) : 0.0F;
       float var4 = Math.max(0.0F, Math.min(1.0F, (this.age - 9000.0F) / 1800.0F));
       float var5 = (float)Math.PI;
+      boolean fx = AnomalyShaders.usable();
+      float grow = this.order == null ? 1.0F : 1.0F + 1.2F * (float)this.eaten / (float)this.order.length;
+      float lensR = Math.max(14.0F + 8.0F * var4, 3.4F * 9.0F * this.s * var3 * grow);
+      // twist the surroundings; the black dot, the thin orange glow and the "eaten block" particles are drawn on top of it
+      AnomalyShaders.distort(this.x, this.y, lensR, var1 * (0.35F + 0.65F * var3), AnomalyShaders.BLACKHOLE, 89.0F);
       Draw.z(89.0F);
       Draw.blend(Blending.additive);
       if (var3 < 1.0F) {
@@ -380,11 +387,13 @@ public class BlackHoleAnomaly extends Anomaly {
       if (var3 > 0.0F) {
          float var16 = 1.0F + (this.order == null ? 0.0F : 1.2F * (float)this.eaten / (float)this.order.length);
          float var17 = 9.0F * this.s * var3 * var16;
-         Draw.color(warm, 0.08F * var1 * var3);
+         Draw.color(fx ? orangeDeep : warm, (fx ? 0.10F : 0.08F) * var1 * var3);
          Fill.circle(this.x, this.y, var17 * 3.0F);
-         Draw.color(soft, 0.12F * var1 * var3);
+         Draw.color(fx ? orange : soft, (fx ? 0.14F : 0.12F) * var1 * var3);
          Fill.circle(this.x, this.y, var17 * 1.9F);
-         this.disc(var17, 0.0F, var5, var1, var3);
+         if (!fx) {
+            this.disc(var17, 0.0F, var5, var1, var3);
+         }
          Draw.blend();
          Draw.color(black, var1);
          Fill.circle(this.x, this.y, var17);
@@ -409,24 +418,26 @@ public class BlackHoleAnomaly extends Anomaly {
 
          for(int var23 = 0; var23 < 3; ++var23) {
             Lines.stroke(var19[var23] * var3);
-            Draw.color(var23 == 2 ? white : (var23 == 1 ? soft : warm), var21[var23] * var1);
+            Draw.color(fx ? (var23 == 2 ? orangeHot : (var23 == 1 ? orange : orangeDeep)) : (var23 == 2 ? white : (var23 == 1 ? soft : warm)), var21[var23] * var1);
             Lines.circle(this.x, this.y, var17 * 1.06F);
          }
 
-         this.disc(var17, var5, 2.0F * var5, var1, var3);
+         if (!fx) {
+            this.disc(var17, var5, 2.0F * var5, var1, var3);
+         }
 
          for(int var24 = 0; var24 < 14; ++var24) {
             float var26 = 0.004F + hash(var24 * 7) * 0.006F;
             float var28 = (var2 * var26 + hash(var24)) % 1.0F;
             float var29 = hash(var24 + 100) * 2.0F * var5 + var28 * 5.0F;
             float var30 = var17 * (1.3F + 3.7F * (1.0F - var28));
-            Draw.color(var24 % 3 == 0 ? white : warm, 0.8F * var1 * var3 * var28);
+            Draw.color(fx ? (var24 % 3 == 0 ? orangeHot : orange) : (var24 % 3 == 0 ? white : warm), 0.8F * var1 * var3 * var28);
             Fill.circle(this.x + (float)Math.cos((double)var29) * var30, this.y + (float)Math.sin((double)var29) * var30 * 0.8F, 0.9F);
          }
       }
 
       Draw.blend();
-      Drawf.light(this.x, this.y, (40.0F + 30.0F * var3) * this.s, white, 0.5F * var1);
+      Drawf.light(this.x, this.y, (40.0F + 30.0F * var3) * this.s, fx && var3 > 0.0F ? orange : white, 0.5F * var1);
       Draw.reset();
    }
 }

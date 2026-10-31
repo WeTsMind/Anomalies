@@ -250,7 +250,7 @@ public class MirrorAnomaly extends Anomaly {
 
    public void draw() {
       if (!(this instanceof AlloyArcMirror)) {
-         AnomalyShaders.distortBox(this.x, this.y, this.hw, this.hh, this.rotation, this.fade(), AnomalyShaders.MIRROR, 110.0F);
+         AnomalyShaders.distortMirror(this.x, this.y, this.hw, this.hh, this.rotation, this.lw, this.rw, this.fade(), 110.0F);
       }
 
       float var1 = this.fade();

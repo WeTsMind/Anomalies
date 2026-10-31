@@ -45,7 +45,9 @@ public class AnomalyShaders {
       + "uniform vec4 u_c;\n"      // shatter, shatterCell, rim, darkCenter
       + "uniform vec4 u_tint;\n"   // rgb, amount
       + "uniform vec4 u_box;\n"    // halfW, halfH, cos, sin (halfW <= 0: circle)
-      + "uniform float u_debug;\n"
+      + "uniform vec4 u_e;\n"      // desaturation, smear, twistWave, twistWaveSpeed
+      + "uniform vec4 u_f;\n"      // invert, innerRadius (0..1, 0 = none), innerLens, innerRimGlow
+      + "uniform vec4 u_g;\n"      // spiral shading, opacity, -, -
       + "varying vec2 v_rel;\n"
       + "vec3 at(vec2 rel){ return texture2D(u_screen, u_uvCenter + rel * u_uvScale).rgb; }\n"
       + "void main(){\n"
@@ -61,12 +63,11 @@ public class AnomalyShaders {
       + "    dir = v_rel / max(len, 0.001);\n"
       + "  }\n"
       + "  if(r >= 1.0) discard;\n"
-      + "  if(u_debug > 0.5 && u_debug < 1.5){ gl_FragColor = vec4(0.8, 0.0, 0.8, 0.8); return; }\n"
-      + "  if(u_debug > 1.5){ gl_FragColor = vec4(at(v_rel) * vec3(0.5, 1.0, 0.5), 1.0); return; }\n"
       + "  float dist = r * u_radius;\n"
       + "  float edge = 1.0 - r;\n"
       + "  float core = edge * edge;\n"
-      + "  float ang = core * u_a.y * sin(u_time * u_a.z);\n"
+      + "  float osc = u_a.z < 0.0 ? 1.0 + 0.25 * sin(u_time * -u_a.z) : sin(u_time * u_a.z);\n"
+      + "  float ang = core * u_a.y * osc + core * u_e.z * sin(dist * 0.3 + u_time * u_e.w);\n"
       + "  float cs = cos(ang);\n"
       + "  float sn = sin(ang);\n"
       + "  vec2 rel = vec2(cs * v_rel.x - sn * v_rel.y, sn * v_rel.x + cs * v_rel.y);\n"
@@ -81,14 +82,119 @@ public class AnomalyShaders {
       + "  }\n"
       + "  float ca = u_a.w * edge;\n"
       + "  vec3 col;\n"
-      + "  col.r = at(rel * (1.0 + ca)).r;\n"
-      + "  col.g = at(rel).g;\n"
-      + "  col.b = at(rel * (1.0 - ca)).b;\n"
+      + "  if(u_e.y > 0.0){\n"
+      + "    vec3 acc = vec3(0.0);\n"
+      + "    for(int k = 0; k < 6; k++){\n"
+      + "      float sa = (float(k) - 2.5) * u_e.y * core;\n"
+      + "      acc += at(vec2(cos(sa) * rel.x - sin(sa) * rel.y, sin(sa) * rel.x + cos(sa) * rel.y));\n"
+      + "    }\n"
+      + "    col = acc / 6.0;\n"
+      + "  } else {\n"
+      + "    col.r = at(rel * (1.0 + ca)).r;\n"
+      + "    col.g = at(rel).g;\n"
+      + "    col.b = at(rel * (1.0 - ca)).b;\n"
+      + "  }\n"
+      + "  if(u_f.y > 0.0){\n"
+      + "    float inner = 1.0 - smoothstep(u_f.y * 0.93, u_f.y, r);\n"
+      + "    float kk = min(r / u_f.y, 1.0);\n"
+      + "    vec3 ci = at(v_rel * mix(u_f.z, 1.0, kk * kk));\n"
+      + "    ci = mix(ci, vec3(1.0) - ci, u_f.x);\n"
+      + "    col = mix(col, ci, inner);\n"
+      + "    float re = (r - u_f.y) / 0.05;\n"
+      + "    col += vec3(0.35, 0.55, 1.0) * u_f.w * exp(-re * re);\n"
+      + "  }\n"
+      + "  col *= 1.0 + u_g.x * sin(phase) * edge;\n"
+      + "  float gray = dot(col, vec3(0.299, 0.587, 0.114));\n"
+      + "  col = mix(col, vec3(gray), u_e.x * smoothstep(0.0, 0.22, edge));\n"
       + "  col *= 1.0 - u_c.w * pow(core, 1.5);\n"
       + "  col = mix(col, u_tint.rgb, u_tint.a * core);\n"
       + "  col += u_tint.rgb * pow(r, 6.0) * u_c.z;\n"
-      + "  float a = u_fade * smoothstep(1.0, 0.88, r);\n"
+      + "  float a = u_g.y * u_fade * smoothstep(1.0, 0.88, r);\n"
       + "  gl_FragColor = vec4(col * a, a);\n"
+      + "}\n";
+
+   /** Shattered-mirror look: the anomaly's own outline is cut into glass shards, each one reflecting a different piece of the scene. */
+   static final String FRAG_MIRROR = "uniform sampler2D u_screen;\n"
+      + "uniform vec2 u_uvCenter;\n"
+      + "uniform vec2 u_uvScale;\n"
+      + "uniform highp float u_time;\n"
+      + "uniform float u_fade;\n"
+      + "uniform vec2 u_size;\n"      // halfW, halfH of the anomaly
+      + "uniform vec2 u_rot;\n"       // cos, sin of its rotation
+      + "uniform float u_lw[15];\n"   // left / right half widths along the length (the real outline of the anomaly)
+      + "uniform float u_rw[15];\n"
+      + "varying vec2 v_rel;\n"
+      + "vec2 hash2(vec2 p){\n"
+      + "  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));\n"
+      + "  return fract(sin(p) * 43758.5453);\n"
+      + "}\n"
+      + "vec3 at(vec2 rel){ return texture2D(u_screen, u_uvCenter + rel * u_uvScale).rgb; }\n"
+      + "float prof(float t, bool left){\n"
+      + "  float f = clamp(t, 0.0, 1.0) * 14.0;\n"
+      + "  float s = 0.0;\n"
+      + "  for(int k = 0; k < 15; k++){\n"
+      + "    float w = max(0.0, 1.0 - abs(f - float(k)));\n"
+      + "    s += w * (left ? u_lw[k] : u_rw[k]);\n"
+      + "  }\n"
+      + "  return s;\n"
+      + "}\n"
+      + "void main(){\n"
+      + "  vec2 q = vec2(u_rot.x * v_rel.x + u_rot.y * v_rel.y, -u_rot.y * v_rel.x + u_rot.x * v_rel.y);\n"
+      + "  float t = (q.y + u_size.y) / (2.0 * u_size.y);\n"
+      + "  if(t < 0.0 || t > 1.0) discard;\n"
+      + "  float w = prof(t, q.x < 0.0);\n"
+      + "  float d = w - abs(q.x);\n"
+      + "  if(d <= 0.0) discard;\n"
+      + "  float cellS = u_size.x * 0.4;\n"
+      + "  vec2 p = q / cellS;\n"
+      + "  vec2 ip = floor(p);\n"
+      + "  vec2 fp = fract(p);\n"
+      + "  float md = 8.0;\n"
+      + "  vec2 r0 = vec2(0.0);\n"
+      + "  vec2 g0 = vec2(0.0);\n"
+      + "  for(int j = -1; j <= 1; j++){\n"
+      + "    for(int i = -1; i <= 1; i++){\n"
+      + "      vec2 g = vec2(float(i), float(j));\n"
+      + "      vec2 o = 0.5 + 0.4 * sin(u_time * 0.012 + 6.2831 * hash2(ip + g));\n"
+      + "      vec2 r = g + o - fp;\n"
+      + "      float dd = dot(r, r);\n"
+      + "      if(dd < md){ md = dd; r0 = r; g0 = g; }\n"
+      + "    }\n"
+      + "  }\n"
+      + "  float edgeD = 8.0;\n"
+      + "  for(int j = -1; j <= 1; j++){\n"
+      + "    for(int i = -1; i <= 1; i++){\n"
+      + "      vec2 g = vec2(float(i), float(j));\n"
+      + "      vec2 o = 0.5 + 0.4 * sin(u_time * 0.012 + 6.2831 * hash2(ip + g));\n"
+      + "      vec2 r = g + o - fp;\n"
+      + "      vec2 df = r - r0;\n"
+      + "      if(dot(df, df) > 0.00001){ edgeD = min(edgeD, dot(0.5 * (r0 + r), normalize(df))); }\n"
+      + "    }\n"
+      + "  }\n"
+      + "  edgeD *= cellS;\n"
+      + "  vec2 id = ip + g0;\n"
+      + "  vec2 h = hash2(id);\n"
+      + "  vec2 h2 = hash2(id + 17.3);\n"
+      + "  vec2 rel = -r0 * cellS;\n"
+      + "  vec2 center = q + r0 * cellS;\n"
+      + "  float ang = (h.x - 0.5) * 1.6 + 0.25 * sin(u_time * 0.01 + h.y * 6.2831);\n"
+      + "  if(h2.x > 0.5) rel.x = -rel.x;\n"
+      + "  rel = vec2(cos(ang) * rel.x - sin(ang) * rel.y, sin(ang) * rel.x + cos(ang) * rel.y) * mix(0.75, 1.5, h.y);\n"
+      + "  vec2 srcL = center + rel + (h2 - 0.5) * u_size.x * 1.6 + vec2(sin(u_time * 0.01 + h.x * 6.2831), cos(u_time * 0.011 + h.y * 6.2831)) * 1.5;\n"
+      + "  vec2 srcW = vec2(u_rot.x * srcL.x - u_rot.y * srcL.y, u_rot.y * srcL.x + u_rot.x * srcL.y);\n"
+      + "  vec3 col;\n"
+      + "  col.r = at(srcW * 1.012).r;\n"
+      + "  col.g = at(srcW).g;\n"
+      + "  col.b = at(srcW * 0.988).b;\n"
+      + "  float shade = 0.7 + 0.5 * h.x + 0.25 * sin(dot(rel, vec2(0.5, 0.8)) * 0.35 + h.y * 6.2831);\n"
+      + "  col = mix(col, vec3(0.75, 0.92, 1.0), 0.28) * shade;\n"
+      + "  float glint = step(0.88, h2.y) * (0.5 + 0.5 * sin(u_time * 0.08 + h2.x * 6.2831));\n"
+      + "  col += vec3(0.6, 0.9, 1.0) * glint * 0.35;\n"
+      + "  float line = 1.0 - smoothstep(0.0, 0.7, edgeD);\n"
+      + "  float glow = 1.0 - smoothstep(0.0, 2.4, edgeD);\n"
+      + "  col += vec3(1.0) * line * 0.9 + vec3(0.45, 0.85, 1.0) * glow * 0.22;\n"
+      + "  col += vec3(0.5, 0.95, 1.0) * (1.0 - smoothstep(0.0, 1.8, d)) * 0.8;\n"
+      + "  gl_FragColor = vec4(col, u_fade * smoothstep(0.0, 0.6, d));\n"
       + "}\n";
 
    /** How one anomaly bends the picture. All numbers are tunable. */
@@ -101,6 +207,16 @@ public class AnomalyShaders {
       public float shatter, shatterCell = 3.0F;
       public float r, g, b, tint;
       public float rim, dark;
+      /** 0..1: how much the colours inside the radius are drained to grey. */
+      public float desat;
+      /** Tangential smear (radians per tap): stretches the picture into arcs around the centre. */
+      public float smear;
+      /** Twist waves running along the radius (amplitude in radians, speed; negative speed = flowing inwards). */
+      public float wave, waveSpeed;
+      /** A separate convex centre: colour inversion (0..1), its radius as a fraction of the whole, magnification (<1) and rim glow. */
+      public float invert, innerR, innerLens = 1.0F, innerGlow;
+      /** Brightness banding along the spiral (0 = off) and overall opacity of the distorted disc (1 = opaque). */
+      public float shade, opacity = 1.0F;
 
       public Style lens(float v) { this.lens = v; return this; }
       public Style swirl(float amount, float speed) { this.swirl = amount; this.swirlSpeed = speed; return this; }
@@ -110,20 +226,31 @@ public class AnomalyShaders {
       public Style tint(float r, float g, float b, float amount) { this.r = r; this.g = g; this.b = b; this.tint = amount; return this; }
       public Style rim(float v) { this.rim = v; return this; }
       public Style dark(float v) { this.dark = v; return this; }
+      public Style desat(float v) { this.desat = v; return this; }
+      public Style smear(float v) { this.smear = v; return this; }
+      public Style wave(float amp, float speed) { this.wave = amp; this.waveSpeed = speed; return this; }
+      public Style shade(float v) { this.shade = v; return this; }
+      public Style opacity(float v) { this.opacity = v; return this; }
+      public Style inner(float invert, float radius, float lens, float glow) { this.invert = invert; this.innerR = radius; this.innerLens = lens; this.innerGlow = glow; return this; }
    }
 
-   public static final Style BARRIER = new Style().lens(0.45F).swirl(1.4F, 0.015F).ripple(1.6F, 0.75F, 0.12F, 0.0F).aberration(0.05F).tint(0.65F, 0.36F, 1.0F, 0.10F).rim(0.25F);
+   // barrier: a smooth convex bubble that magnifies the picture and drains the colours inside it
+   public static final Style BARRIER = new Style().lens(0.5F).swirl(0.35F, 0.02F).aberration(0.015F).tint(1.0F, 1.0F, 1.0F, 0.08F).rim(0.12F).desat(1.0F);
    public static final Style TIME = new Style().lens(0.8F).swirl(0.4F, 0.02F).ripple(0.8F, 0.9F, 0.15F, 0.0F).aberration(0.09F).shatter(2.4F, 3.0F).tint(0.55F, 1.0F, 0.8F, 0.12F).rim(0.3F);
    public static final Style VORTEX = new Style().lens(1.0F).swirl(2.6F, 0.02F).ripple(1.0F, 0.4F, 0.1F, 3.0F).aberration(0.03F).tint(0.7F, 0.8F, 1.0F, 0.05F).rim(0.1F);
-   public static final Style BLACKHOLE = new Style().lens(2.4F).swirl(1.8F, 0.04F).ripple(0.6F, 0.5F, 0.2F, 2.0F).aberration(0.07F).tint(0.5F, 0.35F, 1.0F, 0.05F).rim(0.3F).dark(0.9F);
-   public static final Style WARP = new Style().lens(0.6F).swirl(0.5F, 0.03F).ripple(1.2F, 1.0F, 0.2F, 0.0F).aberration(0.07F).tint(0.7F, 0.4F, 1.0F, 0.10F).rim(0.2F);
+   // black hole: the surroundings are twisted and smeared into arcs around the centre (a negative swirl speed = steady twist)
+   public static final Style BLACKHOLE = new Style().lens(1.5F).swirl(3.2F, -0.05F).aberration(0.03F).tint(1.0F, 0.55F, 0.15F, 0.10F).smear(0.18F).wave(1.1F, -0.07F).ripple(2.0F, 0.3F, -0.12F, 2.0F);
+   // warp: the same twisted surroundings as the black hole, but the centre is a convex bubble with inverted colours
+   public static final Style WARP = new Style().lens(1.3F).swirl(3.0F, -0.05F).aberration(0.02F).smear(0.16F).wave(1.0F, -0.07F).ripple(1.6F, 0.3F, -0.12F, 2.0F).inner(1.0F, 0.38F, 0.55F, 0.9F);
    public static final Style FIRE = new Style().lens(1.0F).ripple(1.3F, 1.3F, 0.35F, 0.0F).aberration(0.02F).tint(1.0F, 0.5F, 0.2F, 0.08F);
    public static final Style BALL = new Style().lens(0.7F).swirl(0.6F, 0.05F).ripple(0.8F, 1.0F, 0.3F, 0.0F).aberration(0.05F).tint(0.5F, 0.7F, 1.0F, 0.08F).rim(0.2F);
    public static final Style TOXIC = new Style().lens(1.0F).ripple(1.0F, 0.5F, 0.08F, 0.0F).aberration(0.015F).tint(0.4F, 1.0F, 0.3F, 0.10F);
-   public static final Style WHIRLPOOL = new Style().lens(0.8F).swirl(2.0F, 0.03F).ripple(1.0F, 0.6F, 0.2F, 2.0F).aberration(0.03F).tint(0.8F, 0.95F, 1.0F, 0.05F).rim(0.1F);
+   // whirlpool: the liquid it appeared in is itself twisted into a funnel; semi-transparent, so the liquid stays visible
+   public static final Style WHIRLPOOL = new Style().lens(1.35F).swirl(2.6F, -0.04F).ripple(1.4F, 0.55F, -0.2F, 3.0F).wave(0.7F, -0.09F).smear(0.1F).aberration(0.02F).tint(1.0F, 1.0F, 1.0F, 0.04F).rim(0.1F).dark(0.3F).shade(0.14F).opacity(0.75F);
    public static final Style MIRROR = new Style().lens(1.0F).ripple(1.2F, 0.5F, 0.1F, 0.0F).aberration(0.06F).tint(0.6F, 0.85F, 1.0F, 0.08F).rim(0.4F);
 
    public static DistortShader distort;
+   public static MirrorShader mirror;
    /** Why the distortion is (not) active; shown in a toast when it is off. */
    public static String status = "not loaded";
    static FrameBuffer screen;
@@ -142,6 +269,12 @@ public class AnomalyShaders {
       try {
          distort = new DistortShader();
          status = "ok";
+         try {
+            mirror = new MirrorShader();
+         } catch (Throwable var2) {
+            mirror = null;
+            Log.err("Anomalies: mirror shader failed to load, mirrors use the simple distortion", var2);
+         }
       } catch (Throwable var1) {
          String msg = String.valueOf(var1.getMessage());
          status = "shader compile failed: " + (msg.length() > 160 ? msg.substring(0, 160) : msg);
@@ -154,7 +287,6 @@ public class AnomalyShaders {
          try {
             // the on/off switch lives in Settings -> Graphics (client-side, default on)
             Vars.ui.settings.graphics.checkPref("anom-shader", true);
-            Vars.ui.settings.graphics.sliderPref("anom-shader-debug", 0, 0, 2, 1, v -> v == 0 ? "off" : (v == 1 ? "magenta disc" : "unwarped copy (green)"));
          } catch (Throwable var3) {
             Log.err(var3);
          }
@@ -194,6 +326,64 @@ public class AnomalyShaders {
       float c = (float)Math.cos(Math.toRadians((double)rotation));
       float s = (float)Math.sin(Math.toRadians((double)rotation));
       Draw.draw(z - 0.05F, () -> pass(x, y, reach, fade, style, halfW, halfH, c, s));
+   }
+
+   /** The shattered-glass mirror, drawn with the anomaly's real outline (lw / rw are its left and right half widths). */
+   public static void distortMirror(float x, float y, float halfW, float halfH, float rotation, float[] lw, float[] rw, float fade, float z) {
+      if (mirror == null) {
+         distortBox(x, y, halfW, halfH, rotation, fade, MIRROR, z);
+         return;
+      }
+
+      float reach = (float)Math.sqrt((double)(halfW * halfW + halfH * halfH));
+      if (!usable() || !visible(x, y, reach, reach)) {
+         return;
+      }
+
+      float c = (float)Math.cos(Math.toRadians((double)rotation));
+      float s = (float)Math.sin(Math.toRadians((double)rotation));
+      Draw.draw(z - 0.05F, () -> passMirror(x, y, halfW, halfH, c, s, lw, rw, fade, reach));
+   }
+
+   static void passMirror(float cx, float cy, float hw, float hh, float c, float s, float[] lw, float[] rw, float fade, float reach) {
+      MirrorShader m = mirror;
+      if (m == null) {
+         return;
+      }
+
+      long id = Core.graphics.getFrameId();
+      if (id != frameId) {
+         frameId = id;
+         passes = 0;
+      }
+
+      if (++passes > MAX_PASSES) {
+         return;
+      }
+
+      try {
+         capture();
+         m.cx = cx;
+         m.cy = cy;
+         m.hw = hw;
+         m.hh = hh;
+         m.c = c;
+         m.s = s;
+         m.fade = fade;
+         m.lw = lw;
+         m.rw = rw;
+         Draw.shader(m);
+         Draw.color();
+         float ext = reach + 2.0F;
+         Fill.rect(cx, cy, ext * 2.0F, ext * 2.0F);
+         Draw.shader();
+      } catch (Throwable var14) {
+         Log.err("Anomalies: mirror pass failed, mirrors fall back to the simple distortion", var14);
+         Draw.shader();
+         mirror = null;
+         final String msg = String.valueOf(var14);
+         Core.app.post(() -> Vars.ui.showInfoToast("[scarlet]Anomalies: mirror shader error[]\n" + msg, 12.0F));
+      }
    }
 
    static void pass(float cx, float cy, float radius, float fade, Style style, float hw, float hh, float c, float s) {
@@ -309,7 +499,70 @@ public class AnomalyShaders {
          this.f4("u_c", st.shatter, st.shatterCell, st.rim, st.dark);
          this.f4("u_tint", st.r, st.g, st.b, st.tint);
          this.f4("u_box", this.hw, this.hh, this.c, this.s);
-         this.f1("u_debug", (float)Core.settings.getInt("anom-shader-debug", 0));
+         this.f4("u_e", st.desat, st.smear, st.wave, st.waveSpeed);
+         this.f4("u_f", st.invert, st.innerR, st.innerLens, st.innerGlow);
+         this.f4("u_g", st.shade, st.opacity, 0.0F, 0.0F);
+         AnomalyShaders.screen.getTexture().bind(1);
+         if (this.hasUniform("u_screen")) {
+            this.setUniformi("u_screen", 1);
+         }
+
+         Gl.activeTexture(Gl.texture0);
+      }
+   }
+
+   public static class MirrorShader extends Shader {
+      public float cx;
+      public float cy;
+      public float hw = 8.0F;
+      public float hh = 16.0F;
+      public float c = 1.0F;
+      public float s;
+      public float fade = 1.0F;
+      public float[] lw;
+      public float[] rw;
+
+      public MirrorShader() {
+         super(VERT, FRAG_MIRROR);
+      }
+
+      void f1(String n, float a) {
+         if (this.hasUniform(n)) {
+            this.setUniformf(n, a);
+         }
+      }
+
+      void f2(String n, float a, float b) {
+         if (this.hasUniform(n)) {
+            this.setUniformf(n, a, b);
+         }
+      }
+
+      public void apply() {
+         float camW = Core.camera.width;
+         float camH = Core.camera.height;
+         float left = Core.camera.position.x - camW / 2.0F;
+         float bottom = Core.camera.position.y - camH / 2.0F;
+         this.f2("u_center", this.cx, this.cy);
+         this.f2("u_uvCenter", (this.cx - left) / camW, (this.cy - bottom) / camH);
+         this.f2("u_uvScale", 1.0F / camW, 1.0F / camH);
+         this.f1("u_time", Time.time % 62831.85F);
+         this.f1("u_fade", this.fade);
+         this.f2("u_size", this.hw, this.hh);
+         this.f2("u_rot", this.c, this.s);
+         // array elements are set by name; elements the compiler dropped are simply skipped
+         for(int i = 0; i < 15; ++i) {
+            try {
+               this.setUniformf("u_lw[" + i + "]", this.lw[i]);
+            } catch (Throwable var7) {
+            }
+
+            try {
+               this.setUniformf("u_rw[" + i + "]", this.rw[i]);
+            } catch (Throwable var8) {
+            }
+         }
+
          AnomalyShaders.screen.getTexture().bind(1);
          if (this.hasUniform("u_screen")) {
             this.setUniformi("u_screen", 1);

@@ -212,7 +212,8 @@ public class WarpAnomaly extends Anomaly {
    }
 
    public void draw() {
-      AnomalyShaders.distort(this.x, this.y, 22.0F * this.s, this.fade(), AnomalyShaders.WARP, 88.0F);
+      AnomalyShaders.distort(this.x, this.y, 30.0F * this.s, this.fade(), AnomalyShaders.WARP, 88.0F);
+      boolean fx = AnomalyShaders.usable();
       float var1 = this.fade();
       float var2 = Time.time;
       float var3 = 11.5F * this.s;
@@ -220,6 +221,7 @@ public class WarpAnomaly extends Anomaly {
       float var5 = (float)Math.PI;
       float var6 = 88.0F;
       Draw.z(var6);
+      if (!fx) {
       Draw.blend(Blending.additive);
       Draw.color(violet, 0.12F * var1 * var4);
       Fill.circle(this.x, this.y, var3 * 2.1F);
@@ -262,6 +264,15 @@ public class WarpAnomaly extends Anomaly {
       for(int var19 = 0; var19 < 3; ++var19) {
          Lines.stroke(var17[var19]);
          Draw.color(var19 == 2 ? light : (var19 == 1 ? cyan : violet), var18[var19] * var1 * var4);
+         Lines.circle(this.x, this.y, var3);
+      }
+
+      } else {
+         // shader look: the bubble itself is drawn by the shader, only a thin cool rim and the drifting motes stay
+         Draw.z(var6 + 0.5F);
+         Draw.blend(Blending.additive);
+         Lines.stroke(1.2F);
+         Draw.color(cyan, 0.35F * var1 * var4);
          Lines.circle(this.x, this.y, var3);
       }
 
