@@ -71,7 +71,7 @@ public class AnomalyShaders {
       + "  float cs = cos(ang);\n"
       + "  float sn = sin(ang);\n"
       + "  vec2 rel = vec2(cs * v_rel.x - sn * v_rel.y, sn * v_rel.x + cs * v_rel.y);\n"
-      + "  rel *= mix(u_a.x, 1.0, r * r);\n"
+      + "  rel *= mix(u_a.x, u_g.z, r * r);\n"
       + "  float phase = dist * u_b.y - u_time * u_b.z + u_b.w * atan(v_rel.y, v_rel.x + 0.0001);\n"
       + "  rel += dir * sin(phase) * u_b.x * edge;\n"
       + "  if(u_c.x > 0.0){\n"
@@ -109,11 +109,12 @@ public class AnomalyShaders {
       + "  col *= 1.0 - u_c.w * pow(core, 1.5);\n"
       + "  col = mix(col, u_tint.rgb, u_tint.a * core);\n"
       + "  col += u_tint.rgb * pow(r, 6.0) * u_c.z;\n"
+      + "  col *= 1.0 - u_g.w * smoothstep(0.55, 1.0, r);\n"
       + "  float a = u_g.y * u_fade * smoothstep(1.0, 0.88, r);\n"
-      + "  gl_FragColor = vec4(col * a, a);\n"
+      + "  gl_FragColor = vec4(col, a);\n"
       + "}\n";
 
-   /** Shattered-mirror look: the anomaly's own outline is cut into glass shards, each one reflecting a different piece of the scene. */
+   /** Shattered-mirror look: the outline of the anomaly is cut into glass triangles, each one a small convex lens. No glow at all. */
    static final String FRAG_MIRROR = "uniform sampler2D u_screen;\n"
       + "uniform vec2 u_uvCenter;\n"
       + "uniform vec2 u_uvScale;\n"
@@ -121,6 +122,10 @@ public class AnomalyShaders {
       + "uniform float u_fade;\n"
       + "uniform vec2 u_size;\n"      // halfW, halfH of the anomaly
       + "uniform vec2 u_rot;\n"       // cos, sin of its rotation
+      + "uniform vec3 u_rip0;\n"      // recent hits: x, y (world axes, relative to the centre), age in ticks
+      + "uniform vec3 u_rip1;\n"
+      + "uniform vec3 u_rip2;\n"
+      + "uniform vec3 u_rip3;\n"
       + "uniform float u_lw[15];\n"   // left / right half widths along the length (the real outline of the anomaly)
       + "uniform float u_rw[15];\n"
       + "varying vec2 v_rel;\n"
@@ -129,6 +134,16 @@ public class AnomalyShaders {
       + "  return fract(sin(p) * 43758.5453);\n"
       + "}\n"
       + "vec3 at(vec2 rel){ return texture2D(u_screen, u_uvCenter + rel * u_uvScale).rgb; }\n"
+      + "vec2 rip(vec3 r, vec2 q){\n"
+      + "  if(r.z > 120.0) return vec2(0.0);\n"
+      + "  vec2 rl = vec2(u_rot.x * r.x + u_rot.y * r.y, -u_rot.y * r.x + u_rot.x * r.y);\n"
+      + "  vec2 dv = q - rl;\n"
+      + "  float dd = length(dv);\n"
+      + "  float front = r.z * 0.9;\n"
+      + "  float m = 1.0 - smoothstep(0.0, 5.0, dd - front);\n"
+      + "  float amp = 3.0 * exp(-r.z * 0.03) * exp(-dd * 0.02) * m;\n"
+      + "  return dv / max(dd, 0.001) * sin((dd - front) * 0.8) * amp;\n"
+      + "}\n"
       + "float prof(float t, bool left){\n"
       + "  float f = clamp(t, 0.0, 1.0) * 14.0;\n"
       + "  float s = 0.0;\n"
@@ -145,56 +160,28 @@ public class AnomalyShaders {
       + "  float w = prof(t, q.x < 0.0);\n"
       + "  float d = w - abs(q.x);\n"
       + "  if(d <= 0.0) discard;\n"
-      + "  float cellS = u_size.x * 0.4;\n"
-      + "  vec2 p = q / cellS;\n"
-      + "  vec2 ip = floor(p);\n"
-      + "  vec2 fp = fract(p);\n"
-      + "  float md = 8.0;\n"
-      + "  vec2 r0 = vec2(0.0);\n"
-      + "  vec2 g0 = vec2(0.0);\n"
-      + "  for(int j = -1; j <= 1; j++){\n"
-      + "    for(int i = -1; i <= 1; i++){\n"
-      + "      vec2 g = vec2(float(i), float(j));\n"
-      + "      vec2 o = 0.5 + 0.4 * sin(u_time * 0.012 + 6.2831 * hash2(ip + g));\n"
-      + "      vec2 r = g + o - fp;\n"
-      + "      float dd = dot(r, r);\n"
-      + "      if(dd < md){ md = dd; r0 = r; g0 = g; }\n"
-      + "    }\n"
-      + "  }\n"
-      + "  float edgeD = 8.0;\n"
-      + "  for(int j = -1; j <= 1; j++){\n"
-      + "    for(int i = -1; i <= 1; i++){\n"
-      + "      vec2 g = vec2(float(i), float(j));\n"
-      + "      vec2 o = 0.5 + 0.4 * sin(u_time * 0.012 + 6.2831 * hash2(ip + g));\n"
-      + "      vec2 r = g + o - fp;\n"
-      + "      vec2 df = r - r0;\n"
-      + "      if(dot(df, df) > 0.00001){ edgeD = min(edgeD, dot(0.5 * (r0 + r), normalize(df))); }\n"
-      + "    }\n"
-      + "  }\n"
-      + "  edgeD *= cellS;\n"
-      + "  vec2 id = ip + g0;\n"
-      + "  vec2 h = hash2(id);\n"
-      + "  vec2 h2 = hash2(id + 17.3);\n"
-      + "  vec2 rel = -r0 * cellS;\n"
-      + "  vec2 center = q + r0 * cellS;\n"
-      + "  float ang = (h.x - 0.5) * 1.6 + 0.25 * sin(u_time * 0.01 + h.y * 6.2831);\n"
-      + "  if(h2.x > 0.5) rel.x = -rel.x;\n"
-      + "  rel = vec2(cos(ang) * rel.x - sin(ang) * rel.y, sin(ang) * rel.x + cos(ang) * rel.y) * mix(0.75, 1.5, h.y);\n"
-      + "  vec2 srcL = center + rel + (h2 - 0.5) * u_size.x * 1.6 + vec2(sin(u_time * 0.01 + h.x * 6.2831), cos(u_time * 0.011 + h.y * 6.2831)) * 1.5;\n"
+      + "  vec2 qs = q + rip(u_rip0, q) + rip(u_rip1, q) + rip(u_rip2, q) + rip(u_rip3, q);\n"
+      + "  float cellS = u_size.x * 0.65;\n"
+      + "  vec2 p = qs / cellS;\n"
+      + "  p += 0.22 * vec2(sin(p.y * 1.7 + 1.3), sin(p.x * 1.9 + 0.7)) + 0.05 * vec2(sin(u_time * 0.01 + p.y), cos(u_time * 0.011 + p.x));\n"
+      + "  vec2 sk = p + (p.x + p.y) * 0.366025;\n"
+      + "  vec2 i = floor(sk);\n"
+      + "  vec2 f = sk - i;\n"
+      + "  bool lower = f.x > f.y;\n"
+      + "  vec2 cs = i + (lower ? vec2(0.66667, 0.33333) : vec2(0.33333, 0.66667));\n"
+      + "  vec2 c = cs - (cs.x + cs.y) * 0.211325;\n"
+      + "  float edge = lower ? min(f.y, min(1.0 - f.x, f.x - f.y)) : min(f.x, min(1.0 - f.y, f.y - f.x));\n"
+      + "  vec2 h = hash2(i + (lower ? 0.0 : 31.7));\n"
+      + "  vec2 rel = p - c;\n"
+      + "  float tt = min(length(rel) / 0.48, 1.0);\n"
+      + "  float k = mix(0.5, 0.78, h.x) + 0.05 * sin(u_time * 0.03 + h.y * 6.2831);\n"
+      + "  vec2 srcL = qs + rel * (mix(k, 1.0, tt * tt) - 1.0) * cellS + (h - 0.5) * 0.25 * cellS;\n"
       + "  vec2 srcW = vec2(u_rot.x * srcL.x - u_rot.y * srcL.y, u_rot.y * srcL.x + u_rot.x * srcL.y);\n"
-      + "  vec3 col;\n"
-      + "  col.r = at(srcW * 1.012).r;\n"
-      + "  col.g = at(srcW).g;\n"
-      + "  col.b = at(srcW * 0.988).b;\n"
-      + "  float shade = 0.7 + 0.5 * h.x + 0.25 * sin(dot(rel, vec2(0.5, 0.8)) * 0.35 + h.y * 6.2831);\n"
-      + "  col = mix(col, vec3(0.75, 0.92, 1.0), 0.28) * shade;\n"
-      + "  float glint = step(0.88, h2.y) * (0.5 + 0.5 * sin(u_time * 0.08 + h2.x * 6.2831));\n"
-      + "  col += vec3(0.6, 0.9, 1.0) * glint * 0.35;\n"
-      + "  float line = 1.0 - smoothstep(0.0, 0.7, edgeD);\n"
-      + "  float glow = 1.0 - smoothstep(0.0, 2.4, edgeD);\n"
-      + "  col += vec3(1.0) * line * 0.9 + vec3(0.45, 0.85, 1.0) * glow * 0.22;\n"
-      + "  col += vec3(0.5, 0.95, 1.0) * (1.0 - smoothstep(0.0, 1.8, d)) * 0.8;\n"
-      + "  gl_FragColor = vec4(col, u_fade * smoothstep(0.0, 0.6, d));\n"
+      + "  vec3 col = at(srcW);\n"
+      + "  col *= 0.93 + 0.14 * h.y;\n"
+      + "  col *= 1.0 - 0.35 * (1.0 - smoothstep(0.0, 0.07, edge));\n"
+      + "  float a = u_fade * smoothstep(0.0, 0.6, d);\n"
+      + "  gl_FragColor = vec4(col, a);\n"
       + "}\n";
 
    /** How one anomaly bends the picture. All numbers are tunable. */
@@ -217,6 +204,8 @@ public class AnomalyShaders {
       public float invert, innerR, innerLens = 1.0F, innerGlow;
       /** Brightness banding along the spiral (0 = off) and overall opacity of the distorted disc (1 = opaque). */
       public float shade, opacity = 1.0F;
+      /** Scale of the sampled picture at the rim (>1 squeezes the outside into the rim like a glass ball) and rim darkening. */
+      public float edgeLens = 1.0F, vignette;
 
       public Style lens(float v) { this.lens = v; return this; }
       public Style swirl(float amount, float speed) { this.swirl = amount; this.swirlSpeed = speed; return this; }
@@ -229,13 +218,15 @@ public class AnomalyShaders {
       public Style desat(float v) { this.desat = v; return this; }
       public Style smear(float v) { this.smear = v; return this; }
       public Style wave(float amp, float speed) { this.wave = amp; this.waveSpeed = speed; return this; }
+      public Style edgeLens(float v) { this.edgeLens = v; return this; }
+      public Style vignette(float v) { this.vignette = v; return this; }
       public Style shade(float v) { this.shade = v; return this; }
       public Style opacity(float v) { this.opacity = v; return this; }
       public Style inner(float invert, float radius, float lens, float glow) { this.invert = invert; this.innerR = radius; this.innerLens = lens; this.innerGlow = glow; return this; }
    }
 
    // barrier: a smooth convex bubble that magnifies the picture and drains the colours inside it
-   public static final Style BARRIER = new Style().lens(0.5F).swirl(0.35F, 0.02F).aberration(0.015F).tint(1.0F, 1.0F, 1.0F, 0.08F).rim(0.12F).desat(1.0F);
+   public static final Style BARRIER = new Style().lens(0.3F).edgeLens(1.8F).vignette(0.3F).swirl(0.35F, 0.02F).aberration(0.04F).tint(1.0F, 1.0F, 1.0F, 0.08F).rim(0.12F).desat(1.0F);
    public static final Style TIME = new Style().lens(0.8F).swirl(0.4F, 0.02F).ripple(0.8F, 0.9F, 0.15F, 0.0F).aberration(0.09F).shatter(2.4F, 3.0F).tint(0.55F, 1.0F, 0.8F, 0.12F).rim(0.3F);
    public static final Style VORTEX = new Style().lens(1.0F).swirl(2.6F, 0.02F).ripple(1.0F, 0.4F, 0.1F, 3.0F).aberration(0.03F).tint(0.7F, 0.8F, 1.0F, 0.05F).rim(0.1F);
    // black hole: the surroundings are twisted and smeared into arcs around the centre (a negative swirl speed = steady twist)
@@ -329,7 +320,7 @@ public class AnomalyShaders {
    }
 
    /** The shattered-glass mirror, drawn with the anomaly's real outline (lw / rw are its left and right half widths). */
-   public static void distortMirror(float x, float y, float halfW, float halfH, float rotation, float[] lw, float[] rw, float fade, float z) {
+   public static void distortMirror(float x, float y, float halfW, float halfH, float rotation, float[] lw, float[] rw, float[] rip, float fade, float z) {
       if (mirror == null) {
          distortBox(x, y, halfW, halfH, rotation, fade, MIRROR, z);
          return;
@@ -342,10 +333,10 @@ public class AnomalyShaders {
 
       float c = (float)Math.cos(Math.toRadians((double)rotation));
       float s = (float)Math.sin(Math.toRadians((double)rotation));
-      Draw.draw(z - 0.05F, () -> passMirror(x, y, halfW, halfH, c, s, lw, rw, fade, reach));
+      Draw.draw(z - 0.05F, () -> passMirror(x, y, halfW, halfH, c, s, lw, rw, rip, fade, reach));
    }
 
-   static void passMirror(float cx, float cy, float hw, float hh, float c, float s, float[] lw, float[] rw, float fade, float reach) {
+   static void passMirror(float cx, float cy, float hw, float hh, float c, float s, float[] lw, float[] rw, float[] rip, float fade, float reach) {
       MirrorShader m = mirror;
       if (m == null) {
          return;
@@ -372,6 +363,7 @@ public class AnomalyShaders {
          m.fade = fade;
          m.lw = lw;
          m.rw = rw;
+         m.rip = rip;
          Draw.shader(m);
          Draw.color();
          float ext = reach + 2.0F;
@@ -501,7 +493,7 @@ public class AnomalyShaders {
          this.f4("u_box", this.hw, this.hh, this.c, this.s);
          this.f4("u_e", st.desat, st.smear, st.wave, st.waveSpeed);
          this.f4("u_f", st.invert, st.innerR, st.innerLens, st.innerGlow);
-         this.f4("u_g", st.shade, st.opacity, 0.0F, 0.0F);
+         this.f4("u_g", st.shade, st.opacity, st.edgeLens, st.vignette);
          AnomalyShaders.screen.getTexture().bind(1);
          if (this.hasUniform("u_screen")) {
             this.setUniformi("u_screen", 1);
@@ -521,6 +513,8 @@ public class AnomalyShaders {
       public float fade = 1.0F;
       public float[] lw;
       public float[] rw;
+      /** Up to 4 recent hits: x, y (relative to the centre) and age in ticks. */
+      public float[] rip = new float[12];
 
       public MirrorShader() {
          super(VERT, FRAG_MIRROR);
@@ -550,6 +544,13 @@ public class AnomalyShaders {
          this.f1("u_fade", this.fade);
          this.f2("u_size", this.hw, this.hh);
          this.f2("u_rot", this.c, this.s);
+         for(int i = 0; i < 4; ++i) {
+            String n = "u_rip" + i;
+            if (this.hasUniform(n)) {
+               this.setUniformf(n, this.rip[i * 3], this.rip[i * 3 + 1], this.rip[i * 3 + 2]);
+            }
+         }
+
          // array elements are set by name; elements the compiler dropped are simply skipped
          for(int i = 0; i < 15; ++i) {
             try {

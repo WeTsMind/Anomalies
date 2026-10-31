@@ -33,6 +33,18 @@ public class MirrorAnomaly extends Anomaly {
    final float[][] bx;
    final float[][] by;
    boolean dropped;
+   // recent hits for the "liquid wave" effect of the mirror shader: x, y (relative to the centre) and the time of the hit
+   final float[] ripPos = new float[8];
+   final float[] ripT = new float[]{-1000.0F, -1000.0F, -1000.0F, -1000.0F};
+   final float[] ripOut = new float[12];
+   int ripI;
+
+   void ripple(float wx, float wy) {
+      this.ripPos[this.ripI * 2] = wx - this.x;
+      this.ripPos[this.ripI * 2 + 1] = wy - this.y;
+      this.ripT[this.ripI] = Time.time;
+      this.ripI = (this.ripI + 1) % 4;
+   }
 
    public static MirrorAnomaly alpha() {
       int[] var0 = SIZES[Mathf.random(SIZES.length - 1)];
@@ -142,6 +154,7 @@ public class MirrorAnomaly extends Anomaly {
             float var25 = this.clip(var21 * var2 + var22 * var3, -var21 * var3 + var22 * var2, var23 * var2 + var24 * var3, -var23 * var3 + var24 * var2);
             if (var25 >= 0.0F) {
                AnomalyManager.reflect(var1);
+               this.ripple(var19 + (var1.x - var19) * var25, var20 + (var1.y - var20) * var25);
             }
 
          } else {
@@ -185,6 +198,7 @@ public class MirrorAnomaly extends Anomaly {
                AnomalyManager.reflected.add(var1.id);
                var1.remove();
                AnomalyFx.pulse.at(var13, var14, 8.0F, glow);
+               this.ripple(var13, var14);
             }
          }
       }
@@ -250,7 +264,17 @@ public class MirrorAnomaly extends Anomaly {
 
    public void draw() {
       if (!(this instanceof AlloyArcMirror)) {
-         AnomalyShaders.distortMirror(this.x, this.y, this.hw, this.hh, this.rotation, this.lw, this.rw, this.fade(), 110.0F);
+         for(int i = 0; i < 4; ++i) {
+            float age = Time.time - this.ripT[i];
+            this.ripOut[i * 3] = this.ripPos[i * 2];
+            this.ripOut[i * 3 + 1] = this.ripPos[i * 2 + 1];
+            this.ripOut[i * 3 + 2] = age < 120.0F ? Math.max(age, 0.0F) : 999.0F;
+         }
+
+         AnomalyShaders.distortMirror(this.x, this.y, this.hw, this.hh, this.rotation, this.lw, this.rw, this.ripOut, this.fade(), 110.0F);
+         if (AnomalyShaders.usable() && AnomalyShaders.mirror != null) {
+            return; // shader look: only the glass facets, none of the glowing outline, cracks and bolts
+         }
       }
 
       float var1 = this.fade();
