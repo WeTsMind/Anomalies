@@ -48,6 +48,7 @@ public class AnomalyShaders {
       + "uniform vec4 u_e;\n"      // desaturation, smear, twistWave, twistWaveSpeed
       + "uniform vec4 u_f;\n"      // invert, innerRadius (0..1, 0 = none), innerLens, innerRimGlow
       + "uniform vec4 u_g;\n"      // spiral shading, opacity, -, -
+      + "uniform vec4 u_h;\n"      // bevel shading, -, -, -
       + "varying vec2 v_rel;\n"
       + "vec3 at(vec2 rel){ return texture2D(u_screen, u_uvCenter + rel * u_uvScale).rgb; }\n"
       + "void main(){\n"
@@ -110,7 +111,8 @@ public class AnomalyShaders {
       + "  col = mix(col, u_tint.rgb, u_tint.a * core);\n"
       + "  col += u_tint.rgb * pow(r, 6.0) * u_c.z;\n"
       + "  col *= 1.0 - u_g.w * smoothstep(0.55, 1.0, r);\n"
-      + "  float a = u_g.y * u_fade * smoothstep(1.0, 0.88, r);\n"
+      + "  col *= 1.0 + u_h.x * dot(v_rel / u_radius, vec2(-0.5, 0.65)) * (0.4 + r);\n"
+      + "  float a = u_g.y * u_fade * (1.0 - smoothstep(0.88, 1.0, r));\n"
       + "  gl_FragColor = vec4(col, a);\n"
       + "}\n";
 
@@ -178,8 +180,11 @@ public class AnomalyShaders {
       + "  vec2 srcL = qs + rel * (mix(k, 1.0, tt * tt) - 1.0) * cellS + (h - 0.5) * 0.25 * cellS;\n"
       + "  vec2 srcW = vec2(u_rot.x * srcL.x - u_rot.y * srcL.y, u_rot.y * srcL.x + u_rot.x * srcL.y);\n"
       + "  vec3 col = at(srcW);\n"
-      + "  col *= 0.93 + 0.14 * h.y;\n"
-      + "  col *= 1.0 - 0.35 * (1.0 - smoothstep(0.0, 0.07, edge));\n"
+      + "  col *= vec3(0.82, 0.93, 1.0);\n"
+      + "  col *= 1.0 + 0.3 * dot(rel / 0.48, vec2(-0.6, 0.8)) * (0.6 + 0.4 * h.x);\n"
+      + "  col *= 0.9 + 0.2 * h.y;\n"
+      + "  col *= 1.0 - 0.5 * (1.0 - smoothstep(0.0, 0.12, edge));\n"
+      + "  col *= 1.0 - 0.4 * (1.0 - smoothstep(0.0, 1.2, d));\n"
       + "  float a = u_fade * smoothstep(0.0, 0.6, d);\n"
       + "  gl_FragColor = vec4(col, a);\n"
       + "}\n";
@@ -206,6 +211,8 @@ public class AnomalyShaders {
       public float shade, opacity = 1.0F;
       /** Scale of the sampled picture at the rim (>1 squeezes the outside into the rim like a glass ball) and rim darkening. */
       public float edgeLens = 1.0F, vignette;
+      /** Glass-ball shading: lighter on the upper left, darker on the lower right (0 = off). */
+      public float bevel;
 
       public Style lens(float v) { this.lens = v; return this; }
       public Style swirl(float amount, float speed) { this.swirl = amount; this.swirlSpeed = speed; return this; }
@@ -218,6 +225,7 @@ public class AnomalyShaders {
       public Style desat(float v) { this.desat = v; return this; }
       public Style smear(float v) { this.smear = v; return this; }
       public Style wave(float amp, float speed) { this.wave = amp; this.waveSpeed = speed; return this; }
+      public Style bevel(float v) { this.bevel = v; return this; }
       public Style edgeLens(float v) { this.edgeLens = v; return this; }
       public Style vignette(float v) { this.vignette = v; return this; }
       public Style shade(float v) { this.shade = v; return this; }
@@ -226,7 +234,7 @@ public class AnomalyShaders {
    }
 
    // barrier: a smooth convex bubble that magnifies the picture and drains the colours inside it
-   public static final Style BARRIER = new Style().lens(0.3F).edgeLens(1.8F).vignette(0.3F).swirl(0.35F, 0.02F).aberration(0.04F).tint(1.0F, 1.0F, 1.0F, 0.08F).rim(0.12F).desat(1.0F);
+   public static final Style BARRIER = new Style().lens(0.3F).edgeLens(1.8F).vignette(0.3F).bevel(0.35F).swirl(0.35F, 0.02F).aberration(0.04F).tint(1.0F, 1.0F, 1.0F, 0.08F).rim(0.12F).desat(1.0F);
    public static final Style TIME = new Style().lens(0.8F).swirl(0.4F, 0.02F).ripple(0.8F, 0.9F, 0.15F, 0.0F).aberration(0.09F).shatter(2.4F, 3.0F).tint(0.55F, 1.0F, 0.8F, 0.12F).rim(0.3F);
    public static final Style VORTEX = new Style().lens(1.0F).swirl(2.6F, 0.02F).ripple(1.0F, 0.4F, 0.1F, 3.0F).aberration(0.03F).tint(0.7F, 0.8F, 1.0F, 0.05F).rim(0.1F);
    // black hole: the surroundings are twisted and smeared into arcs around the centre (a negative swirl speed = steady twist)
@@ -494,6 +502,7 @@ public class AnomalyShaders {
          this.f4("u_e", st.desat, st.smear, st.wave, st.waveSpeed);
          this.f4("u_f", st.invert, st.innerR, st.innerLens, st.innerGlow);
          this.f4("u_g", st.shade, st.opacity, st.edgeLens, st.vignette);
+         this.f4("u_h", st.bevel, 0.0F, 0.0F, 0.0F);
          AnomalyShaders.screen.getTexture().bind(1);
          if (this.hasUniform("u_screen")) {
             this.setUniformi("u_screen", 1);
