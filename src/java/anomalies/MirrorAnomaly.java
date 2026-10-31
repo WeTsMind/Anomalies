@@ -271,7 +271,7 @@ public class MirrorAnomaly extends Anomaly {
             this.ripOut[i * 3 + 2] = age < 120.0F ? Math.max(age, 0.0F) : 999.0F;
          }
 
-         AnomalyShaders.distortMirror(this.x, this.y, this.hw, this.hh, this.rotation, this.lw, this.rw, this.ripOut, this.fade(), 110.0F);
+         AnomalyShaders.distortMirror(this.x, this.y, this.hw, this.hh, this.rotation, this.lw, this.rw, this.ripOut, this.fade(), 88.0F);
          if (AnomalyShaders.usable() && AnomalyShaders.mirror != null) {
             return; // shader look: only the glass facets, none of the glowing outline, cracks and bolts
          }

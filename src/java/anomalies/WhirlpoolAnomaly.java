@@ -104,7 +104,7 @@ public class WhirlpoolAnomaly extends Anomaly {
    }
 
    public void draw() {
-      AnomalyShaders.distort(this.x, this.y, 10.0F, this.fade(), AnomalyShaders.WHIRLPOOL, 110.0F);
+      AnomalyShaders.distort(this.x, this.y, 10.0F, this.fade(), AnomalyShaders.WHIRLPOOL, 88.0F);
       float f = this.fade();
       if (AnomalyShaders.usable()) {
          f *= 0.7F; // semi-transparent: the twisted liquid underneath must stay visible

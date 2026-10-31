@@ -86,7 +86,7 @@ public class DistortionAnomaly extends Anomaly {
       boolean fx = AnomalyShaders.usable();
       if (fx) {
          // real space distortion behind the anomaly; its own drawing stays on top
-         AnomalyShaders.distort(this.x, this.y, 18.0F, var1, AnomalyShaders.BARRIER, 110.0F);
+         AnomalyShaders.distort(this.x, this.y, 18.0F, var1, AnomalyShaders.BARRIER, 88.0F);
          Draw.z(110.01F);
          // barrier look: no loud rings, only a soft pale halo and faint streaks swirling around the rim
          Draw.blend(Blending.additive);

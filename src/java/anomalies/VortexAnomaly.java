@@ -94,7 +94,7 @@ public class VortexAnomaly extends Anomaly {
    }
 
    public void draw() {
-      AnomalyShaders.distort(this.x, this.y, 34.0F, this.fade(), AnomalyShaders.VORTEX, 110.0F);
+      AnomalyShaders.distort(this.x, this.y, 34.0F, this.fade(), AnomalyShaders.VORTEX, 88.0F);
       float var1 = this.fade();
       float var2 = Time.time;
       Draw.color(gray, 0.07F * var1);
