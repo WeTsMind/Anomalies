@@ -29,7 +29,7 @@ import mindustry.world.blocks.defense.turrets.Turret;
  * - geranium.png: the hull, a U-shaped slit with a round hole at its bottom (the ball lightning charges in the hole and leaves through the slit),
  *   three cut-outs at the bottom for the three engine flames,
  * - geranium-wing-l.png / geranium-wing-r.png: the wings, painted in the team colour, each one turned 10 degrees inwards (front towards the hull).
- * The upper outer corners of the wings leave a team-colour trail, like the ones of the Crocus.
+ * The rear outer corners of the wings leave a team-colour trail, like the ones of the Crocus.
  * It shoots the ball lightning of the Golden Ratio, but straight. The whole craft kicks back a little when it fires.
  */
 public class GeraniumUnit extends UnitType {
@@ -38,7 +38,7 @@ public class GeraniumUnit extends UnitType {
    static final float CANVAS = 64.0F;
    /** the three engine flames: the cut-outs at the bottom of the hull, sprite pixels (y down) */
    static final float[][] ENGINES = new float[][]{{112.0F, 133.0F}, {128.0F, 142.0F}, {143.0F, 133.0F}};
-   static final float ENGINE_RADIUS = 1.0F;
+   static final float ENGINE_RADIUS = 1.6F;
    /** where each wing is attached to the hull (left, right), sprite pixels (y down) */
    static final float[][] WING_PIVOT = new float[][]{{114.0F, 100.0F}, {142.0F, 100.0F}};
    /** how far the wings are turned towards the hull, degrees */
@@ -50,8 +50,8 @@ public class GeraniumUnit extends UnitType {
    static final float RELOAD = 120.0F;
    /** how far the hull kicks back at the moment of the shot, world units */
    static final float KICK = 1.4F;
-   /** upper outer corners of the wings (left, right), sprite pixels (y down), before the wings are turned */
-   static final float[][] WING_TIPS = new float[][]{{91.5F, 102.5F}, {164.5F, 102.5F}};
+   /** rear outer corners of the wings (left, right), sprite pixels (y down), before the wings are turned */
+   static final float[][] WING_TIPS = new float[][]{{91.5F, 136.5F}, {164.5F, 136.5F}};
    static final int WING_TRAIL_LEN = 34;
    static final float WING_TRAIL_HALF = 0.35F;
    static final Map<Unit, SeraphUnit.WingTrail[]> trails = new WeakHashMap();
@@ -183,7 +183,7 @@ public class GeraniumUnit extends UnitType {
       this.drawOrb(unit, z, ox, oy);
    }
 
-   /** A team-colour ribbon behind the upper outer corner of each wing. */
+   /** A team-colour ribbon behind the rear outer corner of each wing. */
    void drawTrails(Unit unit, float z) {
       SeraphUnit.WingTrail[] t = trails.get(unit);
       if (t == null) return;
@@ -231,7 +231,8 @@ public class GeraniumUnit extends UnitType {
          // the pivot inside the canvas, from its bottom left corner
          float originX = lx + CANVAS / 2.0F, originY = ly + CANVAS / 2.0F;
          float turn = i == 0 ? -WING_TURN : WING_TURN;
-         Draw.rect(this.wingRegions[i], wx - originX, wy - originY, CANVAS, CANVAS, originX, originY, rot + turn);
+         // this Draw.rect takes the CENTRE of the canvas (not its corner): the pivot has to end up at (wx, wy)
+         Draw.rect(this.wingRegions[i], wx - lx, wy - ly, CANVAS, CANVAS, originX, originY, rot + turn);
       }
       Draw.reset();
    }
@@ -257,14 +258,14 @@ public class GeraniumUnit extends UnitType {
       if (Vars.headless) return;
       float ch = charge(unit);
       float flash = kick(unit);
-      float r = 0.45F + 0.8F * ch;
+      float r = 0.35F + 0.6F * ch;
       float flick = 0.9F + 0.1F * Mathf.sin(Time.time * 0.3F + unit.id);
       point(unit, ORB[0], ORB[1], tmp);
       float bx = tmp[0] + ox, by = tmp[1] + oy;
       Draw.z(z + 0.01F);
       Draw.blend(Blending.additive);
       Draw.color(orbGlow, (0.18F + 0.2F * ch + 0.3F * flash) * flick);
-      Fill.circle(bx, by, r * 2.0F);
+      Fill.circle(bx, by, r * 1.6F);
       Draw.color(orbBody, (0.45F + 0.3F * ch) * flick);
       Fill.circle(bx, by, r);
       Draw.color(orbCore, 0.8F + 0.2F * ch);
