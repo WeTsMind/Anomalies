@@ -12,6 +12,7 @@ public class AnomalyModFixed extends AnomalyModGolden {
    public static UnitType ophan;
    public static UnitType arux;
    public static UnitType crocus;
+   public static UnitType geranium;
    public static OphanCore ophanCore;
    public static SeraphCore seraphCore;
    public static Block laserBlock;
@@ -67,6 +68,12 @@ public class AnomalyModFixed extends AnomalyModGolden {
          crocus = new CrocusUnit("crocus");
       } catch (Throwable var8) {
          Log.err(var8);
+      }
+
+      try {
+         geranium = new GeraniumUnit("geranium");
+      } catch (Throwable var10) {
+         Log.err(var10);
       }
 
    }

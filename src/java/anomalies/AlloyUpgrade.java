@@ -25,17 +25,31 @@ import java.lang.reflect.Field;
  * Upgrade cost: 20 surge alloy, 120 silicon, 50 titanium, 50 plastanium.
  * Arux is an upgrade of Alloy in the Multiplicative Reconstructor.
  * Upgrade cost: 100 surge alloy, 200 silicon, 150 titanium, 35 plastanium.
+ * Geranium is an upgrade of Crocus in the regular (vanilla) Additive Reconstructor.
+ * Upgrade cost: 100 silicon, 10 surge alloy, 30 graphite, 60 gold nuggets.
  * All other units keep the vanilla cost of their reconstructor.
  */
 public class AlloyUpgrade {
    static final String GOLDEN = "anomalies-golden-ratio";
    static final String ALLOY = "anomalies-alloy";
    static final String ARUX = "anomalies-arux";
+   static final String CROCUS = "anomalies-crocus";
+   static final String GERANIUM = "anomalies-geranium";
 
    public static ItemStack[] VANILLA_COST = ItemStack.with(new Object[]{Items.silicon, 40, Items.graphite, 40});
    public static ItemStack[] VANILLA_COST_MULTI = ItemStack.with(new Object[]{Items.silicon, 130, Items.titanium, 80, Items.metaglass, 40});
    public static final ItemStack[] ALLOY_COST = ItemStack.with(new Object[]{Items.surgeAlloy, 20, Items.silicon, 120, Items.titanium, 50, Items.plastanium, 50});
    public static final ItemStack[] ARUX_COST = ItemStack.with(new Object[]{Items.surgeAlloy, 100, Items.silicon, 200, Items.titanium, 150, Items.plastanium, 35});
+
+   static ItemStack[] geraniumCost;
+
+   /** Built on first use: the gold nugget item only exists once the mod content is created. */
+   public static ItemStack[] geraniumCost() {
+      if (geraniumCost == null) {
+         geraniumCost = ItemStack.with(new Object[]{Items.silicon, 100, Items.surgeAlloy, 10, Items.graphite, 30, AnomalyMod.goldNugget, 60});
+      }
+      return geraniumCost;
+   }
 
    /** Runs BEFORE blocks are initialised (from loadContent): swaps the fixed item cost for one that depends on the unit inside. */
    public static void prepare() {
@@ -75,6 +89,7 @@ public class AlloyUpgrade {
    /** Runs AFTER the JSON content is loaded (from init): registers the upgrades and lets the reconstructors accept the extra items. */
    public static void register() {
       add(Blocks.additiveReconstructor, GOLDEN, ALLOY, ALLOY_COST);
+      add(Blocks.additiveReconstructor, CROCUS, GERANIUM, geraniumCost());
       add(Blocks.multiplicativeReconstructor, ALLOY, ARUX, ARUX_COST);
    }
 
@@ -125,6 +140,9 @@ public class AlloyUpgrade {
                if (type != null) {
                   if (additive && (GOLDEN.equals(type.name) || ALLOY.equals(type.name))) {
                      return ALLOY_COST;
+                  }
+                  if (additive && (CROCUS.equals(type.name) || GERANIUM.equals(type.name))) {
+                     return geraniumCost();
                   }
                   if (build.block == Blocks.multiplicativeReconstructor && (ALLOY.equals(type.name) || ARUX.equals(type.name))) {
                      return ARUX_COST;

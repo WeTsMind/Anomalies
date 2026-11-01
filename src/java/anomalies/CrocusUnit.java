@@ -26,8 +26,8 @@ import mindustry.world.blocks.units.UnitFactory;
 
 /**
  * Crocus: tier 1 flyer of the air factory. Sprites share one 96x96 canvas (4 px = 1 world unit), the unit centre is the canvas centre.
- * - crocus.png: hull, with two cut-outs at the bottom: the engine flames sit in them and leave rocket-like trails,
- * - crocus-cannon.png: the cannon in the slit of the hull, it kicks back when it fires,
+ * - crocus.png: hull, with two cut-outs at the bottom: the standard engine flames of a flyer sit in them,
+ * - crocus-cannon.png: the cannon in the slit of the hull (drawn under the hull and a bit wider than the slit, so no hairline gaps show), it kicks back when it fires,
  * - crocus-wing.png: the wings, painted in the team colour; the upper outer corners of the wings leave a team-colour trail.
  */
 public class CrocusUnit extends UnitType {
@@ -35,17 +35,15 @@ public class CrocusUnit extends UnitType {
    /** upper outer corners of the wings, sprite pixels (y down) */
    static final float[][] WING_TIPS = new float[][]{{25.5F, 21.5F}, {70.5F, 21.5F}};
    /** the engine flames: the middle of the two cut-outs at the bottom of the hull, sprite pixels (y down) */
-   static final float[][] ENGINES = new float[][]{{38.0F, 51.0F}, {58.0F, 51.0F}};
+   static final float[][] ENGINES = new float[][]{{38.0F, 52.0F}, {58.0F, 52.0F}};
+   /** radius of one engine flame (the standard flyer engine circle, a bit smaller because there are two of them) */
+   static final float ENGINE_RADIUS = 1.2F;
    static final int WING_TRAIL_LEN = 34;
-   static final int ENGINE_TRAIL_LEN = 26;
    static final float WING_TRAIL_HALF = 0.35F;
-   static final float ENGINE_TRAIL_HALF = 0.9F;
    /** cannon centre: 18 sprite px above the unit centre */
    static final float CANNON_Y = 4.5F;
-   static final Color flameOuter = Color.valueOf("ff8a1f"), flameInner = Color.valueOf("ffd35c");
-   static final Color engTail = Color.valueOf("ff6a00"), engHead = Color.valueOf("ffc24a"), engCore = Color.valueOf("fff1b0");
    static final Color tail = new Color(), head = new Color(), core = new Color();
-   /** 0, 1: wings; 2, 3: engines */
+   /** 0, 1: the wing corners */
    static final Map<Unit, SeraphUnit.WingTrail[]> trails = new WeakHashMap();
    static final float[] tmp = new float[2];
    TextureRegion wingRegion;
@@ -68,7 +66,8 @@ public class CrocusUnit extends UnitType {
       this.targetGround = true;
       this.outlines = false;
       this.drawCell = false;
-      // the default engine circle is not drawn: the flames are drawn by this class, in the cut-outs of the hull
+      // the default single engine circle (centre of the hull) is not drawn: the same standard flames are drawn
+      // by this class, one in each cut-out at the bottom of the hull
       this.engineSize = 0.0F;
 
       Weapon cannon = new Weapon("anomalies-crocus-cannon");
@@ -81,6 +80,7 @@ public class CrocusUnit extends UnitType {
       cannon.recoil = 2.0F; // the cannon kicks back and slides forward again
       cannon.recoilTime = 16.0F;
       cannon.shootCone = 15.0F;
+      cannon.layerOffset = -0.001F; // under the hull: the wider edges of the cannon hide under the hull outline, no gaps
       cannon.ejectEffect = Fx.none;
       cannon.shootSound = soundOf("shootStell", Sounds.shoot);
       cannon.bullet = new CrocusShot();
@@ -120,16 +120,27 @@ public class CrocusUnit extends UnitType {
       }
    }
 
+   /** no shadow and no dark soft blob under the unit */
+   @Override
+   public void drawShadow(Unit unit) {
+   }
+
+   public void drawSoftShadow(Unit unit) {
+   }
+
+   public void drawSoftShadow(float x, float y, float rotation, float alpha) {
+   }
+
    public void update(Unit unit) {
       super.update(unit);
       if (Vars.headless) return;
       SeraphUnit.WingTrail[] t = trails.get(unit);
       if (t == null) {
-         t = new SeraphUnit.WingTrail[4];
-         for (int i = 0; i < 4; ++i) t[i] = new SeraphUnit.WingTrail(i < 2 ? WING_TRAIL_LEN : ENGINE_TRAIL_LEN);
+         t = new SeraphUnit.WingTrail[2];
+         for (int i = 0; i < 2; ++i) t[i] = new SeraphUnit.WingTrail(WING_TRAIL_LEN);
          trails.put(unit, t);
       }
-      for (int i = 0; i < 4; ++i) {
+      for (int i = 0; i < 2; ++i) {
          trailPoint(unit, i, tmp);
          t[i].add(tmp[0], tmp[1]);
       }
@@ -139,7 +150,7 @@ public class CrocusUnit extends UnitType {
       float z = unit.elevation > 0.5F ? (this.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit) : this.groundLayer;
       float rot = unit.rotation - 90.0F;
       this.drawTrails(unit, z);
-      this.drawFlames(unit, z);
+      this.drawEngineFlames(unit, z);
 
       // wings: painted in the team colour, under the hull
       Draw.z(z - 0.03F);
@@ -151,59 +162,44 @@ public class CrocusUnit extends UnitType {
       super.draw(unit);
    }
 
-   /** Flames of the two engines, in the cut-outs at the bottom of the hull. They grow with the speed and flicker. */
-   void drawFlames(Unit unit, float z) {
-      float speedFrac = Mathf.clamp(unit.vel.len() / this.speed);
-      float scl = 0.55F + 0.45F * speedFrac;
-      float back = unit.rotation + 180.0F;
-      float c = Mathf.cosDeg(back), s = Mathf.sinDeg(back);
-      float px = -s, py = c; // across the flame
+   /** The standard flyer engine flame (the same circle the game draws for other flyers), once in each cut-out at the bottom of the hull. */
+   void drawEngineFlames(Unit unit, float z) {
+      float scale = unit.elevation;
+      if (scale <= 0.0F) return;
+      float pulse = Mathf.absin(Time.time, 2.0F, ENGINE_RADIUS / 4.0F);
       Draw.z(z - 0.025F);
       for (int i = 0; i < ENGINES.length; ++i) {
-         float flick = 1.0F + Mathf.absin(Time.time + i * 7.0F, 3.0F, 0.18F) + Mathf.range(0.04F);
          point(unit, ENGINES[i][0], ENGINES[i][1], tmp);
-         float bx = tmp[0], by = tmp[1];
-         float len = 3.4F * scl * flick, w = 1.15F * scl;
-         Draw.color(flameOuter);
-         Fill.tri(bx + px * w, by + py * w, bx - px * w, by - py * w, bx + c * len, by + s * len);
-         Fill.circle(bx, by, w);
-         Draw.color(flameInner);
-         Fill.tri(bx + px * w * 0.62F, by + py * w * 0.62F, bx - px * w * 0.62F, by - py * w * 0.62F, bx + c * len * 0.65F, by + s * len * 0.65F);
-         Fill.circle(bx, by, w * 0.62F);
+         Draw.color(this.engineColor == null ? unit.team.color : this.engineColor);
+         Fill.circle(tmp[0], tmp[1], (ENGINE_RADIUS + pulse) * scale);
          Draw.color(Color.white);
-         Fill.tri(bx + px * w * 0.3F, by + py * w * 0.3F, bx - px * w * 0.3F, by - py * w * 0.3F, bx + c * len * 0.35F, by + s * len * 0.35F);
+         Fill.circle(tmp[0], tmp[1], (ENGINE_RADIUS + pulse) / 2.0F * scale);
       }
       Draw.reset();
    }
 
-   /** Rocket-like trails behind both engines and a team-colour ribbon behind each wing corner. */
+   /** A team-colour ribbon behind each wing corner. */
    void drawTrails(Unit unit, float z) {
       SeraphUnit.WingTrail[] t = trails.get(unit);
       if (t == null) return;
       Draw.z(z - 0.035F);
       Draw.blend(Blending.additive);
-      for (int i = 0; i < 4; ++i) {
+      for (int i = 0; i < 2; ++i) {
          trailPoint(unit, i, tmp);
          t[i].live(tmp[0], tmp[1]);
-         if (i < 2) {
-            tail.set(unit.team.color);
-            head.set(unit.team.color).lerp(Color.white, 0.45F);
-            core.set(head).lerp(Color.white, 0.6F);
-            t[i].draw(tail, head, WING_TRAIL_HALF, 1.0F);
-            t[i].draw(head, core, WING_TRAIL_HALF * 0.5F, 1.0F);
-         } else {
-            t[i].draw(engTail, engHead, ENGINE_TRAIL_HALF, 1.0F);
-            t[i].draw(engHead, engCore, ENGINE_TRAIL_HALF * 0.5F, 1.0F);
-         }
+         tail.set(unit.team.color);
+         head.set(unit.team.color).lerp(Color.white, 0.45F);
+         core.set(head).lerp(Color.white, 0.6F);
+         t[i].draw(tail, head, WING_TRAIL_HALF, 1.0F);
+         t[i].draw(head, core, WING_TRAIL_HALF * 0.5F, 1.0F);
       }
       Draw.blend();
       Draw.reset();
    }
 
-   /** 0, 1: the wing corners; 2, 3: the engines. */
+   /** The wing corners. */
    static void trailPoint(Unit unit, int i, float[] out) {
-      if (i < 2) point(unit, WING_TIPS[i][0], WING_TIPS[i][1], out);
-      else point(unit, ENGINES[i - 2][0], ENGINES[i - 2][1], out);
+      point(unit, WING_TIPS[i][0], WING_TIPS[i][1], out);
    }
 
    /** World position of a sprite pixel (y down, canvas centre = unit centre). */

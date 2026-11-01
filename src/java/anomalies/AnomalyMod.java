@@ -56,6 +56,14 @@ public class AnomalyMod extends Mod {
       Draw.reset();
    });
 
+   /** Blackish smoke rising from the gold crucible while it works. */
+   static final Effect crucibleSmoke = new Effect(110.0F, e -> {
+      Draw.color(Color.valueOf("2b2b2e"), Color.valueOf("575759"), e.fin());
+      Draw.alpha(0.7F * e.fout());
+      Angles.randLenVectors(e.id, 3, 1.0F + e.finpow() * 6.0F, (x, y) -> Fill.circle(e.x + x + e.fin() * 2.0F, e.y + y + e.fin() * 14.0F, 1.0F + e.fin() * 3.2F));
+      Draw.reset();
+   });
+
    public void loadContent() {
       tzinch = new TzinchBlock("tzinch-block");
       projector = new RiftProjector("rift-projector");
@@ -123,6 +131,10 @@ public class AnomalyMod extends Mod {
             this.consumePower(2.5F);
             this.outputItem = new ItemStack(AnomalyMod.stone, 10);
             this.outputLiquids = LiquidStack.with(new Object[]{AnomalyMod.liquidGold, 3.0F / 60.0F});
+            // heat glow of the yellow star + black smoke while it works
+            this.drawer = new DrawMulti(new DrawDefault(), new CrucibleGlow());
+            this.updateEffect = AnomalyMod.crucibleSmoke;
+            this.updateEffectChance = 0.1F;
          }
       };
 
