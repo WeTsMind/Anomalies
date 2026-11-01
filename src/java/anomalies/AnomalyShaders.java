@@ -118,8 +118,7 @@ public class AnomalyShaders {
 
    /**
     * Broken-mirror rift: a jagged outline (the anomaly's own shape) filled with irregular shards of different sizes. Every shard shows
-    * its own piece of the scene (a convex lens, a few concave, tilted, shifted, some flipped, some "deep" and dark), separated by dark
-    * cracks of different widths, with a few long cracks running across several shards. No glow.
+    * its own piece of the scene (a convex lens, a few concave, tilted, shifted, some flipped, some "deep" and dark). No cracks, no outline, no glow.
     */
    static final String FRAG_MIRROR = "uniform sampler2D u_screen;\n"
       + "uniform vec2 u_uvCenter;\n"
@@ -218,15 +217,6 @@ public class AnomalyShaders {
       + "  col *= mix(vec3(0.8, 0.92, 1.0), vec3(1.0), h3.y * 0.5);\n"
       + "  col *= 0.82 + 0.3 * h.y + 0.25 * dot(rel / (0.5 * cellS), vec2(-0.6, 0.8)) * (0.5 + 0.5 * h2.x) + 0.12 * sin(u_time * 0.03 + h3.x * 6.2831);\n"
       + "  col = mix(col, col * vec3(0.35, 0.5, 0.7), step(0.88, h3.y) * 0.8);\n"
-      + "  float crack = 1.0 - smoothstep(0.0, 0.25 + 0.5 * h2.y, edgeD);\n"
-      + "  col = mix(col, vec3(0.03, 0.05, 0.09), crack * 0.85);\n"
-      + "  vec2 id2;\n"
-      + "  vec2 r2;\n"
-      + "  float e2;\n"
-      + "  voro(qs / (cellS * 3.2) + vec2(7.3, 2.1), 0.35, id2, r2, e2);\n"
-      + "  e2 *= cellS * 3.2;\n"
-      + "  col *= 1.0 - 0.55 * (1.0 - smoothstep(0.0, 0.35, e2));\n"
-      + "  col *= 1.0 - 0.5 * (1.0 - smoothstep(0.0, 1.0, d));\n"
       + "  gl_FragColor = vec4(col, u_fade * smoothstep(0.0, 0.5, d));\n"
       + "}\n";
 

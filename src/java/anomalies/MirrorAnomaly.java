@@ -263,7 +263,8 @@ public class MirrorAnomaly extends Anomaly {
    }
 
    public void draw() {
-      if (!(this instanceof AlloyArcMirror)) {
+      // only the natural mirror gets the shader look; mirrors of a team (rift projector, Alloy) keep their own texture
+      if (!(this instanceof AlloyArcMirror) && this.team == null) {
          for(int i = 0; i < 4; ++i) {
             float age = Time.time - this.ripT[i];
             this.ripOut[i * 3] = this.ripPos[i * 2];

@@ -16,6 +16,10 @@ import mindustry.world.blocks.storage.CoreBlock;
 import mindustry.world.meta.BuildVisibility;
 
 public class SeraphCore extends CoreBlock {
+   /** lid centres when closed, in world units from the core centre: the lids (42 and 44 px wide) sit flush with the outer edges of the 64 px core */
+   static final float LID_L = 2.75F, LID_R = 2.5F;
+   /** how far each lid slides out; leaves a 48 px gap, enough for the whole Seraph */
+   static final float OPEN = 8.75F;
    TextureRegion seraphBase;
    TextureRegion seraphLidL;
    TextureRegion seraphLidR;
@@ -89,18 +93,18 @@ public class SeraphCore extends CoreBlock {
 
       public void draw() {
          float var0 = Time.time - this.openStart;
-         float var1 = SeraphAnim.lids(var0) * 7.5F;
+         float var1 = SeraphAnim.lids(var0) * OPEN;
          Draw.rect(SeraphCore.this.seraphBase, this.x, this.y);
          if (var0 >= 0.0F && var0 < SeraphAnim.OPEN_END) {
-            this.drawSeraph(Mathf.clamp(var1 / 7.5F * 5.0F));
+            this.drawSeraph(Mathf.clamp(var1 / OPEN * 5.0F));
          }
-         Draw.rect(SeraphCore.this.seraphLidL, this.x - 3.5F - var1, this.y);
+         Draw.rect(SeraphCore.this.seraphLidL, this.x - LID_L - var1, this.y);
          Draw.color(this.team.color);
-         Draw.rect(SeraphCore.this.seraphTeamL, this.x - 3.5F - var1, this.y);
+         Draw.rect(SeraphCore.this.seraphTeamL, this.x - LID_L - var1, this.y);
          Draw.reset();
-         Draw.rect(SeraphCore.this.seraphLidR, this.x + 3.0F + var1, this.y);
+         Draw.rect(SeraphCore.this.seraphLidR, this.x + LID_R + var1, this.y);
          Draw.color(this.team.color);
-         Draw.rect(SeraphCore.this.seraphTeamR, this.x + 3.0F + var1, this.y);
+         Draw.rect(SeraphCore.this.seraphTeamR, this.x + LID_R + var1, this.y);
          Draw.reset();
       }
 

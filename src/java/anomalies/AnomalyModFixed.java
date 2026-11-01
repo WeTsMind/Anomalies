@@ -11,6 +11,7 @@ public class AnomalyModFixed extends AnomalyModGolden {
    public static UnitType seraph;
    public static UnitType ophan;
    public static UnitType arux;
+   public static UnitType crocus;
    public static OphanCore ophanCore;
    public static SeraphCore seraphCore;
    public static Block laserBlock;
@@ -62,6 +63,12 @@ public class AnomalyModFixed extends AnomalyModGolden {
          Log.err(var6);
       }
 
+      try {
+         crocus = new CrocusUnit("crocus");
+      } catch (Throwable var8) {
+         Log.err(var8);
+      }
+
    }
 
    public void init() {
@@ -71,6 +78,12 @@ public class AnomalyModFixed extends AnomalyModGolden {
       fix("anomalies-alloy");
       fix("anomalies-golden-ratio");
       fix("anomalies-arux");
+
+      try {
+         CrocusUnit.addPlan(crocus);
+      } catch (Throwable var9) {
+         Log.err(var9);
+      }
    }
 
    static void fix(String var0) {
