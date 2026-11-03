@@ -57,6 +57,8 @@ public class EmpTower extends Block {
       this.health = 600;
       this.update = true;
       this.solid = true;
+      this.hasPower = true;
+      this.consumePower(2.0F);
       this.requirements(Category.turret, BuildVisibility.shown, ItemStack.with(new Object[]{AnomalyMod.goldNugget, 100, Items.silicon, 100, Items.copper, 200, Items.lead, 50}));
       if (shock == null) {
          shock = new StatusEffect("emp-shock");
@@ -133,6 +135,8 @@ public class EmpTower extends Block {
       }
 
       public void updateTile() {
+         // no power: the emitter does not spin and the tower does not work
+         if (this.efficiency <= 0.0F) return;
          if (this.cooldown > 0.0F) this.cooldown -= Time.delta;
          boolean server = !Vars.net.client();
          Team tm = this.team;
@@ -194,7 +198,7 @@ public class EmpTower extends Block {
 
       public void draw() {
          super.draw();
-         float readyAmount = this.active > 0.0F ? 1.0F : (this.cooldown <= 0.0F ? 0.35F : 0.0F);
+         float readyAmount = this.efficiency <= 0.0F ? 0.0F : this.active > 0.0F ? 1.0F : (this.cooldown <= 0.0F ? 0.35F : 0.0F);
          if (EmpTower.this.topRegion != null && EmpTower.this.topRegion.found()) {
             Draw.z(Layer.block + 1.0F);
             Draw.rect(EmpTower.this.topRegion, this.x, this.y, this.topRot);

@@ -13,6 +13,8 @@ public class CutterBullet extends WreckBullet {
    static final float[] SHARD_ANGLES = new float[]{38.0F, 78.0F};
    /** how far behind the shell the shards start, world units */
    static final float BEHIND = 3.0F;
+   /** the shards appear only after the shell has flown this far, world units (4 blocks) */
+   static final float SHARD_DIST = 32.0F;
    public final WreckBullet shard;
 
    public CutterBullet(float speed, float damage, float shardDamage, Color color) {
@@ -42,8 +44,10 @@ public class CutterBullet extends WreckBullet {
       this.shard.init();
    }
 
-   public void init(Bullet b) {
-      super.init(b);
+   public void update(Bullet b) {
+      super.update(b);
+      if (b.fdata != 0.0F || b.time * this.speed < SHARD_DIST) return;
+      b.fdata = 1.0F;
       float c = Mathf.cosDeg(b.rotation()), s = Mathf.sinDeg(b.rotation());
       float bx = b.x - c * BEHIND, by = b.y - s * BEHIND;
       for (int i = 0; i < SHARD_ANGLES.length; ++i) {
