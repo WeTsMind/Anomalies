@@ -39,7 +39,7 @@ public class CutterTurret extends ItemTurret {
       this.inaccuracy = 0.0F;
       this.targetAir = true;
       this.targetGround = true;
-      this.shootSound = Sounds.shootBig;
+      this.shootSound = ModSounds.cutterShot();
 
       this.ammo(new Object[]{AnomalyMod.goldNugget, new CutterBullet(6.5F, 90.0F, 40.0F, AnomalyMod.goldNugget.color)});
       this.buildType = () -> new CutterBuild();

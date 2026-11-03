@@ -48,6 +48,7 @@ public class EmpTower extends Block {
    static final float WAVE_TIME = 24.0F;
    static final Color glow = Color.valueOf("ffe04a"), core = Color.valueOf("fff9c8");
    static StatusEffect shock;
+   static arc.audio.Sound pulseSound;
    TextureRegion topRegion;
 
    public EmpTower(String name) {
@@ -180,6 +181,10 @@ public class EmpTower extends Block {
                this.waveT = 0.0F;
                this.chainTimer = 0.0F;
                this.hit.clear();
+               if (!Vars.headless) {
+                  if (pulseSound == null) pulseSound = ModSounds.empPulse();
+                  pulseSound.at(this.x, this.y);
+               }
             }
          } else if (this.cooldown < COOLDOWN - 60.0F) {
             spin = 0.4F;

@@ -43,7 +43,7 @@ public class DemolisherTurret extends ItemTurret {
       this.inaccuracy = 0.0F;
       this.targetAir = true;
       this.targetGround = true;
-      this.shootSound = Sounds.shootBig;
+      this.shootSound = ModSounds.demolisherShot();
 
       if (slow == null) {
          slow = new StatusEffect("demolisher-slow");
