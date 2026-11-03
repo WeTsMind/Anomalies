@@ -29,8 +29,8 @@ public class DemolisherTurret extends ItemTurret {
    static final float KICK = 3.0F;
    /** how long the kick lasts, ticks */
    static final float KICK_TIME = 22.0F;
-   /** the rotation centre of the head is this much lower (towards the back), world units */
-   static final float PIVOT = 3.0F;
+   /** the head and the barrel turn around the middle of the base; their textures sit this much lower (towards the back), world units */
+   static final float LOWER = 3.0F;
    static StatusEffect slow;
    TextureRegion barrelRegion;
 
@@ -43,7 +43,7 @@ public class DemolisherTurret extends ItemTurret {
       this.range = 190.0F;
       this.rotateSpeed = 6.0F;
       this.recoil = 0.0F; // the head stays in place, only the barrel kicks back
-      this.shootY = 23.0F; // the tip of the barrel
+      this.shootY = 23.0F - LOWER; // the tip of the barrel
       this.inaccuracy = 0.0F;
       this.coolant = this.consume(new ConsumeLiquid(Liquids.cryofluid, 0.2F));
       this.targetAir = true;
@@ -90,7 +90,7 @@ public class DemolisherTurret extends ItemTurret {
             this.shotTime = Time.time;
          }
          this.lastHeat = this.heat;
-         float px = Mathf.cosDeg(this.rotation) * PIVOT, py = Mathf.sinDeg(this.rotation) * PIVOT - PIVOT;
+         float px = -Mathf.cosDeg(this.rotation) * LOWER, py = -Mathf.sinDeg(this.rotation) * LOWER;
          float k = (float)Math.pow((double)Mathf.clamp(1.0F - (Time.time - this.shotTime) / KICK_TIME), 1.6D) * KICK;
 
          // the barrel goes between the base and the head
@@ -100,7 +100,7 @@ public class DemolisherTurret extends ItemTurret {
             Draw.rect(DemolisherTurret.this.barrelRegion, this.x - Mathf.cosDeg(this.rotation) * k + px, this.y - Mathf.sinDeg(this.rotation) * k + py, this.rotation - 90.0F);
             Draw.z(z);
          }
-         // the head turns around a point lower than the block centre; no shadow of the tower
+         // the head turns around the middle of the base, the texture sits lower than the pivot; no shadow of the tower
          this.recoilOffset.add(px, py);
          TurretPatch.shadowOff();
          super.draw();

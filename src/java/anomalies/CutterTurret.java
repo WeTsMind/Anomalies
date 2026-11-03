@@ -18,7 +18,7 @@ import mindustry.world.meta.BuildVisibility;
 /**
  * Cutter: a 2x2 item turret fed with gold nuggets. Sprites: cutter-base.png (the base), cutter-barrel.png (the barrel, drawn UNDER the head and
  * kicking back half a block when it fires), cutter.png (the head), cutter-bullet.png (the main shell), cutter-shard.png (the shards);
- * the head and the barrel share a 160x160 canvas (4 px = 1 world unit) whose centre is the rotation centre of the turret.
+ * the head and the barrel share a 160x160 canvas (4 px = 1 world unit) whose centre is the rotation centre of the turret (the middle of the base); the textures are drawn LOWER units behind it.
  * The shell does 90 damage; at the shot, 4 shards fly apart behind it to both sides, 40 damage each. Shells and shards glow in the colour of the ammo.
  */
 public class CutterTurret extends ItemTurret {
@@ -26,8 +26,8 @@ public class CutterTurret extends ItemTurret {
    static final float KICK = 4.0F; // half a block
    /** how long the kick lasts, ticks */
    static final float KICK_TIME = 20.0F;
-   /** the rotation centre of the head is this much lower (towards the back), world units */
-   static final float PIVOT = 3.0F;
+   /** the head and the barrel turn around the middle of the base; their textures sit this much lower (towards the back), world units */
+   static final float LOWER = 3.0F;
    TextureRegion barrelRegion;
 
    public CutterTurret(String name) {
@@ -39,7 +39,7 @@ public class CutterTurret extends ItemTurret {
       this.range = 185.0F;
       this.rotateSpeed = 6.0F;
       this.recoil = 0.0F; // the head stays in place, only the barrel kicks back
-      this.shootY = 9.0F; // the inner end of the slit between the barrel prongs
+      this.shootY = 9.0F - LOWER; // the inner end of the slit between the barrel prongs
       this.inaccuracy = 0.0F;
       this.coolant = this.consume(new ConsumeLiquid(Liquids.cryofluid, 0.2F));
       this.targetAir = true;
@@ -74,7 +74,7 @@ public class CutterTurret extends ItemTurret {
             this.shotTime = Time.time;
          }
          this.lastHeat = this.heat;
-         float px = Mathf.cosDeg(this.rotation) * PIVOT, py = Mathf.sinDeg(this.rotation) * PIVOT - PIVOT;
+         float px = -Mathf.cosDeg(this.rotation) * LOWER, py = -Mathf.sinDeg(this.rotation) * LOWER;
          float k = (float)Math.pow((double)Mathf.clamp(1.0F - (Time.time - this.shotTime) / KICK_TIME), 1.6D) * KICK;
 
          // the barrel goes between the base and the head
@@ -84,7 +84,7 @@ public class CutterTurret extends ItemTurret {
             Draw.rect(CutterTurret.this.barrelRegion, this.x - Mathf.cosDeg(this.rotation) * k + px, this.y - Mathf.sinDeg(this.rotation) * k + py, this.rotation - 90.0F);
             Draw.z(z);
          }
-         // the head turns around a point lower than the block centre; no shadow of the tower
+         // the head turns around the middle of the base, the texture sits lower than the pivot; no shadow of the tower
          this.recoilOffset.add(px, py);
          TurretPatch.shadowOff();
          super.draw();
