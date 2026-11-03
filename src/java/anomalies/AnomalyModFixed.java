@@ -13,6 +13,10 @@ public class AnomalyModFixed extends AnomalyModGolden {
    public static UnitType arux;
    public static UnitType crocus;
    public static UnitType geranium;
+   public static Block demolisher;
+   public static Block cutter;
+   public static Block empTower;
+   public static Block goldWall;
    public static OphanCore ophanCore;
    public static SeraphCore seraphCore;
    public static Block laserBlock;
@@ -68,6 +72,30 @@ public class AnomalyModFixed extends AnomalyModGolden {
          crocus = new CrocusUnit("crocus");
       } catch (Throwable var8) {
          Log.err(var8);
+      }
+
+      try {
+         demolisher = new DemolisherTurret("demolisher");
+      } catch (Throwable var11) {
+         Log.err(var11);
+      }
+
+      try {
+         cutter = new CutterTurret("cutter");
+      } catch (Throwable var12) {
+         Log.err(var12);
+      }
+
+      try {
+         empTower = new EmpTower("emp-tower");
+      } catch (Throwable var13) {
+         Log.err(var13);
+      }
+
+      try {
+         goldWall = new GoldWall("gold-wall");
+      } catch (Throwable var14) {
+         Log.err(var14);
       }
 
       try {
