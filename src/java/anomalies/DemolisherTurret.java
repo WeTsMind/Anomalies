@@ -45,7 +45,6 @@ public class DemolisherTurret extends ItemTurret {
       this.recoil = 0.0F; // the head stays in place, only the barrel kicks back
       this.shootY = 23.0F; // the tip of the barrel
       this.inaccuracy = 0.0F;
-      this.hasShadow = false;
       this.coolant = this.consume(new ConsumeLiquid(Liquids.cryofluid, 0.2F));
       this.targetAir = true;
       this.targetGround = true;
@@ -91,7 +90,7 @@ public class DemolisherTurret extends ItemTurret {
             this.shotTime = Time.time;
          }
          this.lastHeat = this.heat;
-         float px = Mathf.cosDeg(this.rotation) * PIVOT, py = Mathf.sinDeg(this.rotation) * PIVOT;
+         float px = Mathf.cosDeg(this.rotation) * PIVOT, py = Mathf.sinDeg(this.rotation) * PIVOT - PIVOT;
          float k = (float)Math.pow((double)Mathf.clamp(1.0F - (Time.time - this.shotTime) / KICK_TIME), 1.6D) * KICK;
 
          // the barrel goes between the base and the head
