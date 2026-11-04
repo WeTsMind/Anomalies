@@ -44,7 +44,6 @@ public class NestorUnit extends UnitType {
    static final float[] ENGINE = new float[]{128.0F, 151.0F};
    static final float ENGINE_RADIUS = 1.8F;
    /** glowing dots in the middle of the side cuts (big left/right, small left/right), sprite pixels (y down) */
-   static final float[][] DOTS = new float[][]{{51.0F, 162.0F}, {204.0F, 162.0F}, {84.0F, 157.5F}, {171.0F, 157.5F}};
    /** the whole rear line of the craft, left wingtip -> centre (the right half is mirrored), sprite pixels (y down) */
    static final float[][] REAR_HALF = new float[][]{{2.0F, 190.0F}, {11.0F, 183.0F}, {24.0F, 183.0F}, {38.0F, 183.0F}, {54.0F, 183.0F}, {61.0F, 175.0F}, {68.0F, 168.0F}, {77.0F, 168.0F}, {85.0F, 168.0F}, {95.0F, 157.0F}, {106.0F, 146.0F}, {117.0F, 135.0F}, {122.0F, 144.0F}, {128.0F, 151.0F}};
    /** the same line as one continuous polyline from the left wingtip to the right wingtip */
@@ -229,33 +228,15 @@ public class NestorUnit extends UnitType {
          }
 
          Draw.z(z + 0.01F);
+         // the cell works like the standard one: dark when damaged, pulsing, otherwise the team colour
+         Draw.color(this.cellColor(unit));
          Draw.rect(this.cellRegion, unit.x, unit.y, rot);
          Draw.reset();
-         this.drawDots(unit, z);
          this.drawOrb(unit, z);
       } finally {
          unit.x = px;
          unit.y = py;
       }
-   }
-
-   /** Yellow glowing dots in the middle of the side cuts. */
-   void drawDots(Unit unit, float z) {
-      Draw.z(z + 0.012F);
-      Draw.blend(Blending.additive);
-      for (int i = 0; i < DOTS.length; ++i) {
-         point(unit, DOTS[i][0], DOTS[i][1], tmp);
-         float pulse = 0.85F + 0.15F * Mathf.sin(Time.time * 0.12F + i * 1.7F + unit.id);
-         Draw.color(yellow, 0.35F * pulse);
-         Fill.circle(tmp[0], tmp[1], 2.2F * pulse);
-         Draw.color(dotBody, 0.8F);
-         Fill.circle(tmp[0], tmp[1], 1.2F * pulse);
-         Draw.color(pale, 0.95F);
-         Fill.circle(tmp[0], tmp[1], 0.55F);
-         Drawf.light(tmp[0], tmp[1], 8.0F, yellow, 0.25F);
-      }
-      Draw.blend();
-      Draw.reset();
    }
 
    /** The alpha ball lightning charging in the centre slit: grows until the next shot, flashes at the shot. */

@@ -14,7 +14,7 @@ import mindustry.graphics.Layer;
 /** The yellow laser with a white core and round ends (same look for the Ophan and the Seraph mining beam). */
 public class MineBeam {
    public static final Color glow = Color.valueOf("ffc93a");
-   public static final Color core = Color.white;
+   public static final Color core = new Color(1.0F, 1.0F, 1.0F, 1.0F); // own copy: never alias the shared Color.white
 
    public static void draw(Unit unit, float px, float py) {
       if (!unit.mining()) return;

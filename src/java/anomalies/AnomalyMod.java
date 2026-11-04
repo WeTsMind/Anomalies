@@ -161,6 +161,7 @@ public class AnomalyMod extends Mod {
 
    public void init() {
       AnomalyManager.init();
+      UiGuard.init();
       RiftSpawner.init();
       PolcimOre.init();
       RulesHook.init();
