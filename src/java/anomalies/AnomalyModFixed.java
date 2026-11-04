@@ -13,6 +13,7 @@ public class AnomalyModFixed extends AnomalyModGolden {
    public static UnitType arux;
    public static UnitType crocus;
    public static UnitType geranium;
+   public static UnitType nestor;
    public static Block demolisher;
    public static Block cutter;
    public static Block empTower;
@@ -102,6 +103,12 @@ public class AnomalyModFixed extends AnomalyModGolden {
          geranium = new GeraniumUnit("geranium");
       } catch (Throwable var10) {
          Log.err(var10);
+      }
+
+      try {
+         nestor = new NestorUnit("nestor");
+      } catch (Throwable var15) {
+         Log.err(var15);
       }
 
    }

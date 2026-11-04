@@ -19,7 +19,7 @@ import mindustry.world.meta.BuildVisibility;
  * Cutter: a 2x2 item turret fed with gold nuggets. Sprites: cutter-base.png (the base), cutter-barrel.png (the barrel, drawn UNDER the head and
  * kicking back half a block when it fires), cutter.png (the head), cutter-bullet.png (the main shell), cutter-shard.png (the shards);
  * the head and the barrel share a 160x160 canvas (4 px = 1 world unit) whose centre is the rotation centre of the turret (the middle of the base); the textures are drawn LOWER units behind it.
- * The shell does 90 damage; at the shot, 4 shards fly apart behind it to both sides, 40 damage each. Shells and shards glow in the colour of the ammo.
+ * The shell does 100 damage; at the shot, 4 shards fly apart behind it to both sides, 40 damage each. Shells and shards glow in the colour of the ammo.
  */
 public class CutterTurret extends ItemTurret {
    /** how far the barrel kicks back, world units */
@@ -46,7 +46,7 @@ public class CutterTurret extends ItemTurret {
       this.targetGround = true;
       this.shootSound = ModSounds.cutterShot();
 
-      this.ammo(new Object[]{AnomalyMod.goldNugget, new CutterBullet(6.5F, 130.0F, 40.0F, AnomalyMod.goldNugget.color)});
+      this.ammo(new Object[]{AnomalyMod.goldNugget, new CutterBullet(6.5F, 100.0F, 40.0F, AnomalyMod.goldNugget.color)});
       this.buildType = () -> new CutterBuild();
    }
 

@@ -21,6 +21,8 @@ public class CutterBullet extends WreckBullet {
    /** a shard flies apart for this long, then turns towards the shell for HOME_TIME more, ticks */
    static final float APART_TIME = 60.0F, HOME_TIME = 120.0F;
    public final WreckBullet shard;
+   /** angles of the shards of this bullet (each one is mirrored to the other side) */
+   final float[] angles;
 
    /** A shard: slows down while flying apart (1 s), then flies towards the last known position of the main shell (2 s). */
    static class Shard extends WreckBullet {
@@ -45,7 +47,12 @@ public class CutterBullet extends WreckBullet {
    }
 
    public CutterBullet(float speed, float damage, float shardDamage, Color color) {
+      this(speed, damage, shardDamage, color, SHARD_ANGLES);
+   }
+
+   public CutterBullet(float speed, float damage, float shardDamage, Color color, float[] angles) {
       super(speed, damage, color);
+      this.angles = angles;
       this.spriteName = "anomalies-cutter-bullet";
       this.spin = false;
       this.spriteScale = 1.25F;
@@ -84,9 +91,9 @@ public class CutterBullet extends WreckBullet {
       b.fdata = 1.0F;
       float c = Mathf.cosDeg(b.rotation()), s = Mathf.sinDeg(b.rotation());
       float bx = b.x - c * BEHIND, by = b.y - s * BEHIND;
-      for (int i = 0; i < SHARD_ANGLES.length; ++i) {
+      for (int i = 0; i < this.angles.length; ++i) {
          for (int side = -1; side <= 1; side += 2) {
-            Bullet sb = this.shard.create(b.owner, b.team, bx, by, b.rotation() + side * SHARD_ANGLES[i]);
+            Bullet sb = this.shard.create(b.owner, b.team, bx, by, b.rotation() + side * this.angles[i]);
             if (sb != null) sb.data = last;
          }
       }

@@ -13,10 +13,16 @@ import arc.math.geom.Vec2;
 import arc.util.Time;
 import java.util.Map;
 import java.util.WeakHashMap;
+import mindustry.Vars;
+import mindustry.content.Fx;
+import mindustry.entities.bullet.BulletType;
 import mindustry.entities.units.AIController;
+import mindustry.gen.Sounds;
 import mindustry.gen.Unit;
 import mindustry.gen.UnitEntity;
+import mindustry.graphics.Layer;
 import mindustry.type.UnitType;
+import mindustry.type.Weapon;
 
 public class AnomalyHunter extends UnitType {
    static final Color glow = Color.valueOf("1f6bff");
@@ -26,11 +32,28 @@ public class AnomalyHunter extends UnitType {
    static final Color riftCore = Color.valueOf("d2fffc");
    static final float laserRange = 110.0F;
    static final float killTime = 1160.0F;
-   static final float muzzle = 7.0F;
-   static final float[][] coils = new float[][]{{-1.3F, 5.7F}, {1.3F, 5.7F}, {-6.7F, 0.3F}, {6.7F, 0.3F}, {-5.6F, -5.3F}, {5.6F, -5.3F}};
+   static final float muzzle = 6.0F;
+   /** the sprites share one 256x256 canvas (4 px = 1 world unit), the unit centre is the canvas centre */
+   static final float CENTER = 128.0F;
+   static final float CANVAS = 64.0F;
+   /** rear ends of the wings (left, right), sprite pixels (y down) */
+   static final float[][] WING_TIPS = new float[][]{{82.5F, 167.5F}, {173.5F, 167.5F}};
+   static final int WING_TRAIL_LEN = 34;
+   static final float WING_TRAIL_HALF = 0.5F;
+   /** palette of the wings: the trail is painted with it */
+   static final Color trailTail = Color.valueOf("5757c1");
+   static final Color trailHead = Color.valueOf("8aa3f4");
+   static final Color trailCore = new Color();
+   static final Color tmpTail = new Color(), tmpHead = new Color();
+   static final float[] tmp = new float[2];
+   static final Map<Unit, SeraphUnit.WingTrail[]> trails = new WeakHashMap();
+   /** burning an anomaly by hand: while a player sits in the hunter and holds the fire button */
+   static final Map<Unit, Manual> manual = new WeakHashMap();
+   static final float[][] coils = new float[][]{{-1.8F, 6.5F}, {1.8F, 6.5F}, {-6.9F, 1.5F}, {6.9F, 1.5F}, {-5.6F, -3.0F}, {5.6F, -3.0F}};
    static final int[][] links = new int[][]{{0, 2}, {2, 4}, {1, 3}, {3, 5}};
    static final Map<Unit, float[]> beams = new WeakHashMap();
    static TextureRegion symbol;
+   TextureRegion wingRegion;
 
    public AnomalyHunter(String var1) {
       super(var1);
@@ -47,21 +70,148 @@ public class AnomalyHunter extends UnitType {
       this.rotateSpeed = 9.0F;
       this.range = 110.0F;
       this.maxRange = 110.0F;
-      this.engineOffset = 6.5F;
-      this.engineSize = 3.2F;
+      this.engineOffset = 9.0F;
+      this.engineSize = 3.0F;
       this.engineColor = Color.valueOf("7fdcff");
       this.outlines = false;
       this.outlineColor = Color.valueOf("141a2c");
+      this.drawCell = false;
+
+      // invisible weapon with a harmless bullet: it only lets the game treat the fire button as "shooting" for a player inside the hunter
+      Weapon fire = new Weapon();
+      fire.x = 0.0F;
+      fire.y = 0.0F;
+      fire.mirror = false;
+      fire.rotate = false;
+      fire.reload = 20.0F;
+      fire.shootSound = Sounds.none;
+      fire.ejectEffect = Fx.none;
+      fire.bullet = new BulletType(0.0F, 0.0F) {
+         {
+            this.lifetime = 1.0F;
+            this.collides = false;
+            this.hittable = false;
+            this.absorbable = false;
+            this.reflectable = false;
+            this.despawnEffect = Fx.none;
+            this.hitEffect = Fx.none;
+            this.shootEffect = Fx.none;
+            this.smokeEffect = Fx.none;
+         }
+      };
+      this.weapons.add(fire);
+   }
+
+   public void load() {
+      super.load();
+      this.wingRegion = Core.atlas.find(this.name + "-wing");
+      if (Core.atlas.has(this.name + "-icon")) {
+         TextureRegion icon = Core.atlas.find(this.name + "-icon");
+         this.fullIcon = icon;
+         this.uiIcon = icon;
+      }
+   }
+
+   /** the spent charge of a hand-held laser */
+   static class Manual {
+      Anomaly target;
+      float beam;
+      final float[] state = new float[3];
+   }
+
+   static boolean validTarget(Anomaly a) {
+      if (a instanceof TurretBall || AlloyUnit.alloyMirrors.contains(a)) return false;
+      if (a.dead || a.life - a.age < 60.0F) return false;
+      return !(a instanceof MirrorAnomaly) || ((MirrorAnomaly)a).team == null;
+   }
+
+   static void burnOut(Anomaly a) {
+      if (a instanceof MirrorAnomaly && ((MirrorAnomaly)a).team != null) {
+         a.dead = true;
+      } else {
+         a.life = Math.min(a.life, a.age + 40.0F);
+      }
+   }
+
+   /** A player inside the hunter aims with the cursor and holds the fire button: the beam burns the anomaly under the cursor. */
+   static void manualUpdate(Unit unit) {
+      if (Vars.net.client()) return; // the server decides, the beam reaches the clients through the usual sync
+      Manual m = manual.get(unit);
+      if (m == null) {
+         m = new Manual();
+         manual.put(unit, m);
+      }
+      if (m.target != null && !validTarget(m.target)) {
+         m.target = null;
+         m.beam = 0.0F;
+      }
+      Anomaly best = null;
+      if (unit.isShooting) {
+         float bestD = Float.MAX_VALUE;
+         for (int i = 0; i < AnomalyManager.list.size; ++i) {
+            Anomaly a = (Anomaly)AnomalyManager.list.get(i);
+            if (!validTarget(a)) continue;
+            if (Mathf.dst(unit.x, unit.y, a.x, a.y) > 121.0F) continue;
+            float d = Mathf.dst(unit.aimX, unit.aimY, a.x, a.y);
+            // the cursor must be on the anomaly (a little slack)
+            if (d > a.tileRadius * 8.0F + 12.0F) continue;
+            if (a == m.target) d -= 1000.0F; // keep burning the same one
+            if (d < bestD) {
+               bestD = d;
+               best = a;
+            }
+         }
+      }
+      if (best != m.target) {
+         m.target = best;
+         m.beam = 0.0F;
+      }
+      if (best != null) {
+         m.beam = Math.min(killTime, m.beam + Time.delta);
+         m.state[0] = best.x;
+         m.state[1] = best.y;
+         m.state[2] = Math.min(1.0F, m.beam / 20.0F);
+         beams.put(unit, m.state);
+         if (m.beam >= killTime) {
+            burnOut(best);
+            m.beam = 0.0F;
+            m.target = null;
+            beams.remove(unit);
+         }
+      } else {
+         m.beam = Math.max(0.0F, m.beam - Time.delta * 2.0F);
+         beams.remove(unit);
+      }
    }
 
    public void update(Unit var1) {
       super.update(var1);
 
       try {
-         if (!var1.isPlayer() && !(var1.controller() instanceof HunterAI)) {
-            var1.controller(new HunterAI());
+         if (var1.isPlayer()) {
+            manualUpdate(var1);
+         } else {
+            if (manual.remove(var1) != null) {
+               beams.remove(var1);
+            }
+            if (!(var1.controller() instanceof HunterAI)) {
+               var1.controller(new HunterAI());
+            }
          }
       } catch (Throwable var3) {
+      }
+
+      if (!Vars.headless) {
+         SeraphUnit.WingTrail[] t = trails.get(var1);
+         if (t == null) {
+            t = new SeraphUnit.WingTrail[2];
+            for (int i = 0; i < 2; ++i) t[i] = new SeraphUnit.WingTrail(WING_TRAIL_LEN);
+            trails.put(var1, t);
+         }
+         for (int i = 0; i < 2; ++i) {
+            tipPoint(var1, i, tmp);
+            t[i].add(tmp[0], tmp[1]);
+         }
       }
 
    }
@@ -106,7 +256,45 @@ public class AnomalyHunter extends UnitType {
       }
    }
 
+   /** World position of a sprite pixel (y down, canvas centre = unit centre). */
+   static void tipPoint(Unit unit, int i, float[] out) {
+      float a = unit.rotation - 90.0F;
+      float c = Mathf.cosDeg(a), s = Mathf.sinDeg(a);
+      float lx = (WING_TIPS[i][0] - CENTER) / 4.0F;
+      float ly = (CENTER - WING_TIPS[i][1]) / 4.0F;
+      out[0] = unit.x + lx * c - ly * s;
+      out[1] = unit.y + lx * s + ly * c;
+   }
+
+   /** The two wings (under the hull) and the blue ribbons behind their rear ends. */
+   void drawWingsAndTrails(Unit unit) {
+      float z = unit.elevation > 0.5F ? (this.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit) : this.groundLayer;
+      SeraphUnit.WingTrail[] t = trails.get(unit);
+      if (t != null) {
+         Draw.z(z - 0.035F);
+         Draw.blend(Blending.additive);
+         for (int i = 0; i < 2; ++i) {
+            tipPoint(unit, i, tmp);
+            t[i].live(tmp[0], tmp[1]);
+            tmpTail.set(trailTail);
+            tmpHead.set(trailHead);
+            trailCore.set(trailHead).lerp(Color.white, 0.6F);
+            t[i].draw(tmpTail, tmpHead, WING_TRAIL_HALF, 1.0F);
+            t[i].draw(tmpHead, trailCore, WING_TRAIL_HALF * 0.5F, 1.0F);
+         }
+         Draw.blend();
+         Draw.reset();
+      }
+      if (this.wingRegion != null && this.wingRegion.found()) {
+         Draw.z(z - 0.03F);
+         Draw.color(Color.white);
+         Draw.rect(this.wingRegion, unit.x, unit.y, CANVAS, CANVAS, unit.rotation - 90.0F);
+         Draw.reset();
+      }
+   }
+
    public void draw(Unit var1) {
+      this.drawWingsAndTrails(var1);
       super.draw(var1);
       float[] var2 = (float[])beams.get(var1);
       float var3 = var2 == null ? 0.0F : var2[2];
@@ -133,8 +321,8 @@ public class AnomalyHunter extends UnitType {
       }
 
       if (var2 != null && var3 > 0.01F) {
-         float var15 = lx(var1, 0.0F, 5.5F);
-         float var17 = ly(var1, 0.0F, 5.5F);
+         float var15 = lx(var1, 0.0F, muzzle);
+         float var17 = ly(var1, 0.0F, muzzle);
          float var18 = 0.8F + Mathf.absin(Time.time, 3.0F, 0.2F);
          float[] var19 = new float[]{6.0F, 3.2F, 1.4F};
          float[] var20 = new float[]{0.25F, 0.75F, 1.0F};
@@ -177,15 +365,7 @@ public class AnomalyHunter extends UnitType {
       float beam;
 
       boolean valid(Anomaly var1) {
-         if (!(var1 instanceof TurretBall) && !AlloyUnit.alloyMirrors.contains(var1)) {
-            if (!var1.dead && !(var1.life - var1.age < 60.0F)) {
-               return !(var1 instanceof MirrorAnomaly) || ((MirrorAnomaly)var1).team == null;
-            } else {
-               return false;
-            }
-         } else {
-            return false;
-         }
+         return AnomalyHunter.validTarget(var1);
       }
 
       public void updateUnit() {
