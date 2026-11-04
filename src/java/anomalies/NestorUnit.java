@@ -8,6 +8,7 @@ import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
 import arc.util.Time;
+import arc.util.Tmp;
 import java.util.Map;
 import java.util.WeakHashMap;
 import mindustry.Vars;
@@ -29,7 +30,7 @@ import mindustry.type.Weapon;
  * - centre slit: an alpha ball lightning charges there (reload 2.5 s) and is fired; the whole craft kicks back a little,
  * - 4 side guns (nestor-gun-side, nestor-gun-mid), rotate freely, yellow Stell-style bolts, reload 1.5 s, recoil,
  * - 2 small static front guns (nestor-gun-front), Cutter shell with 2 shards, reload 2 s, recoil.
- * The wings leave a trail along the whole rear edge.
+ * The whole rear line leaves one wide, solid trail band.
  */
 public class NestorUnit extends UnitType {
    static final float CENTER = 128.0F;
@@ -44,15 +45,30 @@ public class NestorUnit extends UnitType {
    static final float ENGINE_RADIUS = 1.8F;
    /** glowing dots in the middle of the side cuts (big left/right, small left/right), sprite pixels (y down) */
    static final float[][] DOTS = new float[][]{{51.0F, 162.0F}, {204.0F, 162.0F}, {84.0F, 157.5F}, {171.0F, 157.5F}};
-   /** points along the rear edge of the wings (left wing; the right wing is mirrored), sprite pixels (y down) */
-   static final float[][] EDGE = new float[][]{{3.0F, 189.0F}, {14.0F, 180.0F}, {26.0F, 168.0F}, {38.0F, 156.0F}, {50.0F, 144.0F}, {62.0F, 132.0F}};
-   static final int TRAIL_LEN = 26;
-   static final float TRAIL_HALF = 0.3F;
+   /** the whole rear line of the craft, left wingtip -> centre (the right half is mirrored), sprite pixels (y down) */
+   static final float[][] REAR_HALF = new float[][]{{2.0F, 190.0F}, {11.0F, 183.0F}, {24.0F, 183.0F}, {38.0F, 183.0F}, {54.0F, 183.0F}, {61.0F, 175.0F}, {68.0F, 168.0F}, {77.0F, 168.0F}, {85.0F, 168.0F}, {95.0F, 157.0F}, {106.0F, 146.0F}, {117.0F, 135.0F}, {122.0F, 144.0F}, {128.0F, 151.0F}};
+   /** the same line as one continuous polyline from the left wingtip to the right wingtip */
+   static final float[][] REAR = buildRear();
+   /** history length of the trail (ticks) */
+   static final int TRAIL_LEN = 22;
+   /** how far behind the rear line the always-visible glow strip reaches, world units */
+   static final float GLOW_BACK = 2.6F;
+   static final float TRAIL_ALPHA = 0.55F;
    static final Color yellow = Color.valueOf("ffd21f"), pale = Color.valueOf("fff8d0"), dotBody = Color.valueOf("ffe95e");
    static final Map<Unit, SeraphUnit.WingTrail[]> trails = new WeakHashMap();
    static final Color tail = new Color(), head = new Color(), core = new Color();
    static final float[] tmp = new float[2];
    TextureRegion wingRegion, cutBig, cutSmall, cellRegion;
+
+   static float[][] buildRear() {
+      int h = REAR_HALF.length;
+      float[][] r = new float[h * 2 - 1][];
+      for (int i = 0; i < h; ++i) {
+         r[i] = REAR_HALF[i];
+         if (i < h - 1) r[r.length - 1 - i] = new float[]{255.0F - REAR_HALF[i][0], REAR_HALF[i][1]};
+      }
+      return r;
+   }
 
    public NestorUnit(String name) {
       super(name);
@@ -100,6 +116,7 @@ public class NestorUnit extends UnitType {
       front.y = 12.0F;
       front.shootY = 2.75F;
       front.mirror = true;
+      front.layerOffset = -0.002F; // drawn under the hull, like in the reference picture
       front.alternate = false;
       front.rotate = false;
       front.reload = RELOAD_FRONT;
@@ -171,12 +188,12 @@ public class NestorUnit extends UnitType {
       if (Vars.headless) return;
       SeraphUnit.WingTrail[] t = trails.get(unit);
       if (t == null) {
-         t = new SeraphUnit.WingTrail[EDGE.length * 2];
+         t = new SeraphUnit.WingTrail[REAR.length];
          for (int i = 0; i < t.length; ++i) t[i] = new SeraphUnit.WingTrail(TRAIL_LEN);
          trails.put(unit, t);
       }
       for (int i = 0; i < t.length; ++i) {
-         edgePoint(unit, i, tmp);
+         point(unit, REAR[i][0], REAR[i][1], tmp);
          t[i].add(tmp[0], tmp[1]);
       }
    }
@@ -204,7 +221,12 @@ public class NestorUnit extends UnitType {
          Draw.reset();
 
          // hull and the guns (drawn by the weapons, with their recoil)
-         super.draw(unit);
+         TurretPatch.shadowOff();
+         try {
+            super.draw(unit);
+         } finally {
+            TurretPatch.shadowOn();
+         }
 
          Draw.z(z + 0.01F);
          Draw.rect(this.cellRegion, unit.x, unit.y, rot);
@@ -271,31 +293,54 @@ public class NestorUnit extends UnitType {
       Draw.reset();
    }
 
-   /** Team-colour ribbons along the whole rear edge of both wings. */
+   /**
+    * One wide, solid team-colour band along the whole rear line of the craft (wingtip to wingtip). Every point of the rear
+    * line leaves a history; neighbouring histories are joined into quads, so the band is as wide as the craft itself and
+    * fades out towards its end. A short glow strip right behind the line keeps it visible when the craft hovers.
+    */
    void drawTrails(Unit unit, float z) {
       SeraphUnit.WingTrail[] t = trails.get(unit);
       if (t == null) return;
       tail.set(unit.team.color);
       head.set(unit.team.color).lerp(Color.white, 0.45F);
       core.set(head).lerp(Color.white, 0.6F);
+      int cnt = t.length;
+      int steps = Integer.MAX_VALUE; // common length of the histories (they are aligned from the newest end)
+      for (int i = 0; i < cnt; ++i) {
+         point(unit, REAR[i][0], REAR[i][1], tmp);
+         t[i].live(tmp[0], tmp[1]);
+         steps = Math.min(steps, t[i].size() + 1);
+      }
       Draw.z(z - 0.035F);
       Draw.blend(Blending.additive);
-      for (int i = 0; i < t.length; ++i) {
-         edgePoint(unit, i, tmp);
-         t[i].live(tmp[0], tmp[1]);
-         t[i].draw(tail, head, TRAIL_HALF, 1.0F);
-         t[i].draw(head, core, TRAIL_HALF * 0.5F, 1.0F);
+
+      // the glow strip right behind the rear line
+      float bx = Mathf.cosDeg(unit.rotation + 180.0F) * GLOW_BACK, by = Mathf.sinDeg(unit.rotation + 180.0F) * GLOW_BACK;
+      float cs = Tmp.c1.set(head).a(TRAIL_ALPHA).toFloatBits(), ce = Tmp.c2.set(tail).a(0.0F).toFloatBits();
+      for (int i = 0; i + 1 < cnt; ++i) {
+         float x0 = t[i].liveX, y0 = t[i].liveY, x1 = t[i + 1].liveX, y1 = t[i + 1].liveY;
+         Fill.quad(x0, y0, cs, x1, y1, cs, x1 + bx, y1 + by, ce, x0 + bx, y0 + by, ce);
+      }
+
+      // the swept band: pass 0 = whole length (tail -> head), pass 1 = bright core near the craft
+      if (steps >= 2) {
+         for (int pass = 0; pass < 2; ++pass) {
+            int last = pass == 0 ? steps - 1 : Math.max(1, (int)((steps - 1) * 0.45F));
+            for (int k = 0; k < last; ++k) {
+               float f0 = 1.0F - k / (float)(steps - 1), f1 = 1.0F - (k + 1) / (float)(steps - 1); // 1 = at the craft, 0 = end
+               float a0 = TRAIL_ALPHA * f0 * f0 * (pass == 0 ? 1.0F : 0.5F), a1 = TRAIL_ALPHA * f1 * f1 * (pass == 0 ? 1.0F : 0.5F);
+               Color from = pass == 0 ? tail : head, to = pass == 0 ? head : core;
+               float c0 = Tmp.c1.set(from).lerp(to, f0).a(a0).toFloatBits(), c1 = Tmp.c2.set(from).lerp(to, f1).a(a1).toFloatBits();
+               for (int i = 0; i + 1 < cnt; ++i) {
+                  int ia = t[i].size() - k, ib = t[i + 1].size() - k; // index of age k (the live position is index size())
+                  Fill.quad(t[i].gx(ia), t[i].gy(ia), c0, t[i + 1].gx(ib), t[i + 1].gy(ib), c0,
+                     t[i + 1].gx(ib - 1), t[i + 1].gy(ib - 1), c1, t[i].gx(ia - 1), t[i].gy(ia - 1), c1);
+               }
+            }
+         }
       }
       Draw.blend();
       Draw.reset();
-   }
-
-   /** Point i of the rear edge: the first half belongs to the left wing, the second to the right (mirrored). */
-   static void edgePoint(Unit unit, int i, float[] out) {
-      int n = EDGE.length;
-      float px = EDGE[i % n][0], py = EDGE[i % n][1];
-      if (i >= n) px = 255.0F - px;
-      point(unit, px, py, out);
    }
 
    /** World position of a sprite pixel (y down, canvas centre = unit centre). */

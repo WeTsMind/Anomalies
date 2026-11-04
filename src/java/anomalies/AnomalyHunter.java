@@ -293,9 +293,25 @@ public class AnomalyHunter extends UnitType {
       }
    }
 
+   /** no shadow and no dark soft blob under the unit */
+   @Override
+   public void drawShadow(Unit unit) {
+   }
+
+   public void drawSoftShadow(Unit unit) {
+   }
+
+   public void drawSoftShadow(float x, float y, float rotation, float alpha) {
+   }
+
    public void draw(Unit var1) {
       this.drawWingsAndTrails(var1);
-      super.draw(var1);
+      TurretPatch.shadowOff();
+      try {
+         super.draw(var1);
+      } finally {
+         TurretPatch.shadowOn();
+      }
       float[] var2 = (float[])beams.get(var1);
       float var3 = var2 == null ? 0.0F : var2[2];
       Draw.z(116.0F);
