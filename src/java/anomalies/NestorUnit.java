@@ -16,7 +16,7 @@ import mindustry.content.Items;
 import mindustry.gen.Sounds;
 import mindustry.gen.Unit;
 import mindustry.gen.UnitEntity;
-import mindustry.gen.WeaponMount;
+import mindustry.entities.units.WeaponMount;
 import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 import mindustry.type.UnitType;
