@@ -28,7 +28,7 @@ import mindustry.world.blocks.units.UnitFactory;
  * Crocus: tier 1 flyer of the air factory. Sprites share one 96x96 canvas (4 px = 1 world unit), the unit centre is the canvas centre.
  * - crocus.png: hull, with two cut-outs at the bottom: the standard engine flames of a flyer sit in them,
  * - crocus-cannon.png: the cannon in the slit of the hull (drawn under the hull and a bit wider than the slit, so no hairline gaps show), it kicks back when it fires,
- * - crocus-wing.png: the wings, painted in the team colour; the upper outer corners of the wings leave a team-colour trail.
+ * - crocus-wing.png: the wings, in their own colours and glowing; the upper outer corners of the wings leave a team-colour trail.
  */
 public class CrocusUnit extends UnitType {
    static final float CENTER = 48.0F;
@@ -152,10 +152,15 @@ public class CrocusUnit extends UnitType {
       this.drawTrails(unit, z);
       this.drawEngineFlames(unit, z);
 
-      // wings: painted in the team colour, under the hull
+      // wings: in their own colours (no team tint), under the hull, and they glow
       Draw.z(z - 0.03F);
-      Draw.color(unit.team.color);
       Draw.rect(this.wingRegion, unit.x, unit.y, rot);
+      float pulse = 0.85F + 0.15F * Mathf.sin(Time.time * 0.1F + unit.id);
+      Draw.z(z - 0.029F);
+      Draw.blend(Blending.additive);
+      Draw.color(Color.white, 0.5F * pulse);
+      Draw.rect(this.wingRegion, unit.x, unit.y, rot);
+      Draw.blend();
       Draw.reset();
 
       // hull and the cannon (drawn by the weapon, with its recoil)

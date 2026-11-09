@@ -29,23 +29,16 @@ import mindustry.type.Weapon;
 import mindustry.world.blocks.storage.CoreBlock;
 
 public class SeraphUnit extends UnitType {
-   // wing root in sprite pixels (128x128, y down) and fold side (+1 left, -1 right)
-   static final float[][] WINGS = new float[][]{{49.0F, 38.0F, 1.0F}, {78.5F, 38.0F, -1.0F}, {54.5F, 53.0F, 1.0F}, {72.5F, 53.0F, -1.0F}};
+   /** the sprites share one 256x256 canvas (4 px = 1 world unit); the unit centre is the canvas centre */
+   static final float CENTER = 128.0F;
+   // wing root in sprite pixels (256x256, y down) and fold side (+1 left, -1 right): front (big) wings left / right, rear (small) wings left / right
+   static final float[][] WINGS = new float[][]{{115.0F, 117.0F, 1.0F}, {141.0F, 117.0F, -1.0F}, {119.0F, 140.0F, 1.0F}, {137.0F, 140.0F, -1.0F}};
    static final float FOLD = 36.0F;
-   // wing tips (sprite px), glow tint and trail colour: front (big) wings red, rear (small) wings gold
-   static final float[][] TIPS = new float[][]{{29.0F, 75.0F}, {98.0F, 75.0F}, {39.0F, 82.0F}, {88.0F, 82.0F}};
-   // bright, glowing coral / gold (same hues as the wing sprites, just lighter)
-   static final Color NEON_RED = Color.valueOf("ff9a84");
-   static final Color NEON_GOLD = Color.valueOf("ffe08a");
-   // trail colours sampled from the wing sprites: front wings ff4f41 / ff9967, rear wings ff9400 / ffb857
-   static final Color TRAIL_RED = Color.valueOf("ff4f41");
-   static final Color TRAIL_GOLD = Color.valueOf("ff9400");
-   static final Color HEAD_RED = Color.valueOf("ff9967");
-   static final Color HEAD_GOLD = Color.valueOf("ffb857");
+   // wing tips (sprite px): the outer lower corners, where the trails start
+   static final float[][] TIPS = new float[][]{{73.5F, 153.5F}, {182.5F, 153.5F}, {88.0F, 162.5F}, {168.0F, 162.5F}};
    static final Color ENGINE = Color.valueOf("ffd633");
-   static final Color[] GLOW = new Color[]{NEON_RED, NEON_RED, NEON_GOLD, NEON_GOLD};
-   static final Color[] TRAIL = new Color[]{TRAIL_RED, TRAIL_RED, TRAIL_GOLD, TRAIL_GOLD};
-   static final Color[] HEAD = new Color[]{HEAD_RED, HEAD_RED, HEAD_GOLD, HEAD_GOLD};
+   /** the wings and their trails are painted in the team colour */
+   static final Color tail = new Color(), head = new Color(), core = new Color(), glow = new Color();
    /** half width of the ribbon at the wing tip, world units (thin) */
    static final float TRAIL_HALF = 0.3F;
    static final int TRAIL_LEN = 34;
@@ -64,7 +57,7 @@ public class SeraphUnit extends UnitType {
       this.speed = 3.0F;
       this.accel = 0.07F;
       this.drag = 0.06F;
-      this.hitSize = 12.0F;
+      this.hitSize = 14.0F;
       this.rotateSpeed = 4.0F;
       this.omniMovement = false;
       this.faceTarget = false;
@@ -76,7 +69,7 @@ public class SeraphUnit extends UnitType {
       this.mineFloor = true;
       this.mineWalls = false;
       this.itemCapacity = 30;
-      this.engineOffset = 1.5F; // flame starts right under the cell, not in the air behind the body
+      this.engineOffset = 6.25F; // flame starts right under the cell (5.5 units below the centre), not in the air behind the body
       this.engineSize = 1.4F;
       // sharp engine trail: the game's own tapered trail behind the rear flame
       this.engineColor = ENGINE;
@@ -84,6 +77,26 @@ public class SeraphUnit extends UnitType {
       this.trailLength = 14;
       this.trailScl = 0.5F;
       this.outlines = false;
+
+      // two small guns on the shoulders of the hull: they fire in turn (1, 2, 1, 2) every 0.5 s, each one every 1 s.
+      // The shell throws shards like the Cutter, but the shards fly straight.
+      Weapon gun = new Weapon("anomalies-seraph-gun");
+      gun.x = 3.5F;
+      gun.y = 3.125F;
+      gun.shootY = 1.9F;
+      gun.mirror = true;
+      gun.alternate = true;
+      gun.rotate = false;
+      gun.reload = 60.0F;
+      gun.recoil = 1.0F;
+      gun.recoilTime = 10.0F;
+      gun.shootCone = 20.0F;
+      gun.ejectEffect = Fx.none;
+      gun.shootSound = ModSounds.cutterShot();
+      CutterBullet shell = new CutterBullet(6.5F, 10.0F, 4.0F, Color.valueOf("ffd27f"), CutterBullet.SHARD_ANGLES, true);
+      shell.lifetime = 26.0F;
+      gun.bullet = shell;
+      this.weapons.add(gun);
    }
 
    /** The cell colour: the plain team colour, same as the team details of the Ophan. */
@@ -94,10 +107,7 @@ public class SeraphUnit extends UnitType {
    /** The cell next to the Seraph is tinted with the plain team colour (dimmer and pulsing when damaged). */
    @Override
    public Color cellColor(Unit unit) {
-      float f = Mathf.clamp(unit.healthf());
-      Color vivid = Tmp.c2.set(unit.team.color);
-      float k = Mathf.clamp(0.3F + 0.7F * (f + Mathf.absin(Time.time, Math.max(f * 5.0F, 1.0F), 1.0F - f)));
-      return Tmp.c1.set(Color.black).lerp(vivid, k);
+      return TeamTint.cell(unit);
    }
 
    public void load() {
@@ -187,8 +197,8 @@ public class SeraphUnit extends UnitType {
       float var6 = Mathf.sinDeg(var4);
 
       for(int var7 = 0; var7 < 4; ++var7) {
-         float var8 = (WINGS[var7][0] - 64.0F) / 4.0F;
-         float var9 = (64.0F - WINGS[var7][1]) / 4.0F;
+         float var8 = (WINGS[var7][0] - CENTER) / 4.0F;
+         float var9 = (CENTER - WINGS[var7][1]) / 4.0F;
          float var10 = WINGS[var7][2] * 36.0F * (1.0F - var2);
          float var11 = Mathf.cosDeg(var10);
          float var12 = Mathf.sinDeg(var10);
@@ -197,20 +207,21 @@ public class SeraphUnit extends UnitType {
          float var15 = var8 + var13 * var11 - var14 * var12;
          float var16 = var9 + var13 * var12 + var14 * var11;
          Draw.blend(Blending.additive);
-         Draw.color(Color.white, 0.55F * var17);
+         Draw.color(TeamTint.cell(var1), 0.55F * var17);
          Draw.rect(this.wingRegions[var7], var1.x + var15 * var5 - var16 * var6, var1.y + var15 * var6 + var16 * var5, var4 + var10);
       }
 
       Draw.blend(Blending.additive);
       float var18 = 1.0F; // constant wing light, no pulsing
+      glow.set(TeamTint.cell(var1)).lerp(Color.white, 0.25F); // like the cell: grey and pulsing when damaged
 
       for(int var19 = 0; var19 < 4; ++var19) {
          float var20 = WINGS[var19][2] * 36.0F * (1.0F - var2);
-         wingPoint(var1, var19, 64.0F, 64.0F, var2, tmp);
-         Draw.color(GLOW[var19], 0.8F * var18 * var17);
+         wingPoint(var1, var19, CENTER, CENTER, var2, tmp);
+         Draw.color(glow, 0.8F * var18 * var17);
          Draw.rect(this.wingRegions[var19], tmp[0], tmp[1], var4 + var20);
-         Draw.color(GLOW[var19], 0.32F * var18 * var17);
-         Draw.rect(this.wingRegions[var19], tmp[0], tmp[1], 36.0F, 36.0F, var4 + var20);
+         Draw.color(glow, 0.32F * var18 * var17);
+         Draw.rect(this.wingRegions[var19], tmp[0], tmp[1], 72.0F, 72.0F, var4 + var20);
       }
 
       Draw.blend();
@@ -222,13 +233,13 @@ public class SeraphUnit extends UnitType {
       float var6 = var0.rotation - 90.0F;
       float var7 = Mathf.cosDeg(var6);
       float var8 = Mathf.sinDeg(var6);
-      float var9 = (WINGS[var1][0] - 64.0F) / 4.0F;
-      float var10 = (64.0F - WINGS[var1][1]) / 4.0F;
+      float var9 = (WINGS[var1][0] - CENTER) / 4.0F;
+      float var10 = (CENTER - WINGS[var1][1]) / 4.0F;
       float var11 = WINGS[var1][2] * 36.0F * (1.0F - var4);
       float var12 = Mathf.cosDeg(var11);
       float var13 = Mathf.sinDeg(var11);
-      float var14 = (var2 - 64.0F) / 4.0F - var9;
-      float var15 = (64.0F - var3) / 4.0F - var10;
+      float var14 = (var2 - CENTER) / 4.0F - var9;
+      float var15 = (CENTER - var3) / 4.0F - var10;
       float var16 = var9 + var14 * var12 - var15 * var13;
       float var17 = var10 + var14 * var13 + var15 * var12;
       var5[0] = var0.x + var16 * var7 - var17 * var8;
@@ -252,8 +263,12 @@ public class SeraphUnit extends UnitType {
          for(int var7 = 0; var7 < 4; ++var7) {
             wingPoint(var1, var7, TIPS[var7][0], TIPS[var7][1], var8, tmp);
             var3[var7].live(tmp[0], tmp[1]);
-            var3[var7].draw(TRAIL[var7], HEAD[var7], TRAIL_HALF, var2);
-            var3[var7].draw(HEAD[var7], NEON_GOLD, TRAIL_HALF * 0.5F, var2); // bright thin core
+            // team colour ribbon with a brighter thin core
+            tail.set(var1.team.color);
+            head.set(var1.team.color).lerp(Color.white, 0.45F);
+            core.set(head).lerp(Color.white, 0.6F);
+            var3[var7].draw(tail, head, TRAIL_HALF, var2);
+            var3[var7].draw(head, core, TRAIL_HALF * 0.5F, var2);
          }
 
          Draw.blend();

@@ -1,6 +1,7 @@
 package anomalies;
 
 import arc.Core;
+import arc.graphics.Blending;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
@@ -110,11 +111,13 @@ public class SeraphCore extends CoreBlock {
 
       /** The Seraph with its wings folded back, resting inside the open core until it flies out. */
       void drawSeraph(float var1) {
-         Draw.color(Color.white, var1);
+         // the wings are painted in the team colour (and glow, like the flying unit)
+         Draw.blend(Blending.additive);
+         Draw.color(this.team.color, 0.7F * var1);
 
          for(int var2 = 0; var2 < 4; ++var2) {
-            float var3 = (SeraphUnit.WINGS[var2][0] - 64.0F) / 4.0F;
-            float var4 = (64.0F - SeraphUnit.WINGS[var2][1]) / 4.0F;
+            float var3 = (SeraphUnit.WINGS[var2][0] - SeraphUnit.CENTER) / 4.0F;
+            float var4 = (SeraphUnit.CENTER - SeraphUnit.WINGS[var2][1]) / 4.0F;
             float var5 = SeraphUnit.WINGS[var2][2] * 36.0F;
             float var6 = Mathf.cosDeg(var5);
             float var7 = Mathf.sinDeg(var5);
@@ -123,6 +126,8 @@ public class SeraphCore extends CoreBlock {
             Draw.rect(SeraphCore.this.seraphWings[var2], this.x + var3 + var8 * var6 - var9 * var7, this.y + var4 + var8 * var7 + var9 * var6, var5);
          }
 
+         Draw.blend();
+         Draw.color(Color.white, var1);
          Draw.rect(SeraphCore.this.seraphBody, this.x, this.y);
          Draw.color(SeraphUnit.vivid(this.team), var1);
          Draw.rect(SeraphCore.this.seraphCell, this.x, this.y);

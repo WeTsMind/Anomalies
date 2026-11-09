@@ -28,8 +28,8 @@ import mindustry.world.blocks.defense.turrets.Turret;
  * the unit centre is the canvas centre.
  * - geranium.png: the hull, a U-shaped slit with a round hole at its bottom (the ball lightning charges in the hole and leaves through the slit),
  *   three cut-outs at the bottom for the three engine flames,
- * - geranium-wing-l.png / geranium-wing-r.png: the wings, painted in the team colour, each one turned 10 degrees inwards (front towards the hull).
- * The rear outer corners of the wings leave a team-colour trail, like the ones of the Crocus.
+ * - geranium-wing-l.png / geranium-wing-r.png: the wings (a big front one and a small rear one each), in their own colours and glowing, each pair turned 10 degrees inwards.
+ * The rear outer corners of the front and of the rear wings leave a team-colour trail each (two pairs).
  * It shoots the ball lightning of the Golden Ratio, but straight. The whole craft kicks back a little when it fires.
  */
 public class GeraniumUnit extends UnitType {
@@ -51,7 +51,9 @@ public class GeraniumUnit extends UnitType {
    /** how far the hull kicks back at the moment of the shot, world units */
    static final float KICK = 1.4F;
    /** rear outer corners of the wings (left, right), sprite pixels (y down), before the wings are turned */
-   static final float[][] WING_TIPS = new float[][]{{91.5F, 136.5F}, {164.5F, 136.5F}};
+   static final float[][] WING_TIPS = new float[][]{{91.5F, 136.5F}, {164.5F, 136.5F}, {103.5F, 143.5F}, {152.5F, 143.5F}};
+   /** trails: 0, 1 = the rear outer corners of the front wings (left, right), 2, 3 = the same of the rear (small) wings */
+   static final int TRAILS = 4;
    static final int WING_TRAIL_LEN = 34;
    static final float WING_TRAIL_HALF = 0.35F;
    static final Map<Unit, SeraphUnit.WingTrail[]> trails = new WeakHashMap();
@@ -148,11 +150,11 @@ public class GeraniumUnit extends UnitType {
       if (Vars.headless) return;
       SeraphUnit.WingTrail[] t = trails.get(unit);
       if (t == null) {
-         t = new SeraphUnit.WingTrail[2];
-         for (int i = 0; i < 2; ++i) t[i] = new SeraphUnit.WingTrail(WING_TRAIL_LEN);
+         t = new SeraphUnit.WingTrail[TRAILS];
+         for (int i = 0; i < TRAILS; ++i) t[i] = new SeraphUnit.WingTrail(WING_TRAIL_LEN);
          trails.put(unit, t);
       }
-      for (int i = 0; i < 2; ++i) {
+      for (int i = 0; i < TRAILS; ++i) {
          tipPoint(unit, i, tmp);
          t[i].add(tmp[0], tmp[1]);
       }
@@ -183,13 +185,13 @@ public class GeraniumUnit extends UnitType {
       this.drawOrb(unit, z, ox, oy);
    }
 
-   /** A team-colour ribbon behind the rear outer corner of each wing. */
+   /** Team-colour ribbons behind the rear outer corners of the front wings and of the rear wings (two pairs). */
    void drawTrails(Unit unit, float z) {
       SeraphUnit.WingTrail[] t = trails.get(unit);
       if (t == null) return;
       Draw.z(z - 0.035F);
       Draw.blend(Blending.additive);
-      for (int i = 0; i < 2; ++i) {
+      for (int i = 0; i < TRAILS; ++i) {
          tipPoint(unit, i, tmp);
          t[i].live(tmp[0], tmp[1]);
          tail.set(unit.team.color);
@@ -204,9 +206,10 @@ public class GeraniumUnit extends UnitType {
 
    /** World position of the corner of a wing, after the wing has been turned inwards around its pivot. */
    static void tipPoint(Unit unit, int i, float[] out) {
-      float pxl = (WING_PIVOT[i][0] - CENTER) / 4.0F, pyl = (CENTER - WING_PIVOT[i][1]) / 4.0F;
+      int side = i & 1; // the rear wings sit on the same pivots as the front ones
+      float pxl = (WING_PIVOT[side][0] - CENTER) / 4.0F, pyl = (CENTER - WING_PIVOT[side][1]) / 4.0F;
       float dx = (WING_TIPS[i][0] - WING_PIVOT[i][0]) / 4.0F, dy = (WING_PIVOT[i][1] - WING_TIPS[i][1]) / 4.0F;
-      float turn = i == 0 ? -WING_TURN : WING_TURN;
+      float turn = side == 0 ? -WING_TURN : WING_TURN;
       float tc = Mathf.cosDeg(turn), ts = Mathf.sinDeg(turn);
       float lx = pxl + dx * tc - dy * ts;
       float ly = pyl + dx * ts + dy * tc;
@@ -219,8 +222,17 @@ public class GeraniumUnit extends UnitType {
    /** The two wings: team colour, under the hull, each one turned inwards around the point where it meets the hull. */
    void drawWings(Unit unit, float z, float rot, float ox, float oy) {
       float c = Mathf.cosDeg(rot), s = Mathf.sinDeg(rot);
+      float pulse = 0.85F + 0.15F * Mathf.sin(Time.time * 0.1F + unit.id);
       Draw.z(z - 0.03F);
-      Draw.color(unit.team.color);
+      for (int pass = 0; pass < 2; ++pass) {
+      // pass 0: the wings in their own colours (no team tint); pass 1: the same sprites once more, additive, so they glow
+      if (pass == 0) {
+         Draw.color(Color.white);
+      } else {
+         Draw.z(z - 0.029F);
+         Draw.blend(Blending.additive);
+         Draw.color(Color.white, 0.5F * pulse);
+      }
       for (int i = 0; i < 2; ++i) {
          if (this.wingRegions[i] == null) continue;
          float lx = (WING_PIVOT[i][0] - CENTER) / 4.0F;
@@ -233,6 +245,8 @@ public class GeraniumUnit extends UnitType {
          float turn = i == 0 ? -WING_TURN : WING_TURN;
          // this Draw.rect takes the CENTRE of the canvas (not its corner): the pivot has to end up at (wx, wy)
          Draw.rect(this.wingRegions[i], wx - lx, wy - ly, CANVAS, CANVAS, originX, originY, rot + turn);
+      }
+      if (pass == 1) Draw.blend();
       }
       Draw.reset();
    }

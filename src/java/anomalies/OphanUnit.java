@@ -19,14 +19,14 @@ import mindustry.world.blocks.storage.CoreBlock;
 
 /**
  * Winged flyer. Sprite layers (256x256 canvas, unit centre = canvas centre, 4 px = 1 world unit):
- * two wings (team colour, folded back when spawned from the core, then spread), dark body, front piece, team-colour details.
- * Each wing end leaves a thin glowing ribbon trail. Builder and miner (standard build / mining beams, no repair beam).
+ * six wings (three pairs: outer, middle, inner; team colour, folded back when spawned from the core, then spread) and the dark body.
+ * The end of every wing leaves a thin glowing ribbon trail in the team colour. Builder and miner (standard build / mining beams, no repair beam).
  */
 public class OphanUnit extends UnitType {
-   /** wing roots in sprite pixels (y down) and fold side (+1 left, -1 right) */
-   static final float[][] ROOTS = new float[][]{{108.0F, 90.0F, 1.0F}, {148.0F, 90.0F, -1.0F}};
-   /** wing ends in sprite pixels (y down): rear end of left/right wing, then front end of left/right wing (wing index = i & 1) */
-   static final float[][] TIPS = new float[][]{{95.0F, 162.0F}, {161.0F, 162.0F}, {108.0F, 90.0F}, {148.0F, 90.0F}};
+   /** wing roots in sprite pixels (y down) and fold side (+1 left, -1 right); wing index = pair * 2 + (0 left, 1 right), pairs: outer, middle, inner */
+   static final float[][] ROOTS = new float[][]{{112.0F, 115.0F, 1.0F}, {144.0F, 115.0F, -1.0F}, {106.0F, 139.0F, 1.0F}, {150.0F, 139.0F, -1.0F}, {120.0F, 143.0F, 1.0F}, {136.0F, 143.0F, -1.0F}};
+   /** the end of every wing (sprite pixels, y down), same order as the roots: the outer lower corner, where its trail starts */
+   static final float[][] TIPS = new float[][]{{57.5F, 158.5F}, {198.5F, 158.5F}, {76.5F, 170.5F}, {179.5F, 170.5F}, {98.5F, 177.5F}, {157.5F, 177.5F}};
    static final float FOLD = 30.0F;
    static final int TRAIL_LEN = 34;
    static final float TRAIL_HALF = 0.3F;
@@ -35,9 +35,8 @@ public class OphanUnit extends UnitType {
    static final float ENGINE_TRAIL_HALF = 0.6F;
    static final Map<Unit, SeraphUnit.WingTrail[]> trails = new WeakHashMap();
    static final float[] tmp = new float[2];
-   static final Color tail = new Color(), head = new Color(), core = new Color();
-   final TextureRegion[] wingRegions = new TextureRegion[2];
-   TextureRegion teamRegion, frontRegion, frontTeamRegion;
+   static final Color tail = new Color(), head = new Color(), core = new Color(), glow = new Color();
+   final TextureRegion[] wingRegions = new TextureRegion[6];
 
    public OphanUnit(String name) {
       super(name);
@@ -49,13 +48,13 @@ public class OphanUnit extends UnitType {
       this.speed = 2.8F;
       this.accel = 0.07F;
       this.drag = 0.06F;
-      this.hitSize = 16.0F;
+      this.hitSize = 18.0F;
       this.rotateSpeed = 4.0F;
       this.omniMovement = false;
       this.faceTarget = false;
       this.outlines = false;
       this.drawCell = false;
-      this.engineOffset = 3.0F; // flame comes out from behind the sprite
+      this.engineOffset = 5.75F; // flame comes out from behind the sprite
       this.engineSize = 1.8F;
       // builder / miner like the Emanate
       this.buildSpeed = 3.0F;
@@ -72,11 +71,7 @@ public class OphanUnit extends UnitType {
 
    public void load() {
       super.load();
-      this.wingRegions[0] = Core.atlas.find(this.name + "-wing-l");
-      this.wingRegions[1] = Core.atlas.find(this.name + "-wing-r");
-      this.teamRegion = Core.atlas.find(this.name + "-team");
-      this.frontRegion = Core.atlas.find(this.name + "-front");
-      this.frontTeamRegion = Core.atlas.find(this.name + "-front-team");
+      for (int i = 0; i < this.wingRegions.length; ++i) this.wingRegions[i] = Core.atlas.find(this.name + "-wing-" + i);
       if (Core.atlas.has(this.name + "-icon")) {
          TextureRegion icon = Core.atlas.find(this.name + "-icon");
          this.fullIcon = icon;
@@ -108,7 +103,7 @@ public class OphanUnit extends UnitType {
       } else {
          float p = SeraphAnim.wings(age);
          for (int i = 0; i < TIPS.length; ++i) {
-            wingPoint(unit.x, unit.y, unit.rotation - 90.0F, i & 1, TIPS[i][0], TIPS[i][1], p, tmp);
+            wingPoint(unit.x, unit.y, unit.rotation - 90.0F, i, TIPS[i][0], TIPS[i][1], p, tmp);
             t[i].add(tmp[0], tmp[1]);
          }
          enginePoint(unit, tmp);
@@ -136,26 +131,32 @@ public class OphanUnit extends UnitType {
       float rot = unit.rotation - 90.0F;
       this.drawTrails(unit, z);
       Draw.z(z - 0.03F);
-      this.drawWings(unit.x, unit.y, rot, p, unit.team, 1.0F);
+      this.drawWings(unit.x, unit.y, rot, p, TeamTint.cell(unit), 1.0F);
 
       super.draw(unit);
-
-      Draw.z(z + 0.005F);
-      Draw.rect(this.frontRegion, unit.x, unit.y, rot);
-      Draw.z(z + 0.01F);
-      Draw.color(unit.team.color);
-      Draw.rect(this.teamRegion, unit.x, unit.y, rot);
-      Draw.rect(this.frontTeamRegion, unit.x, unit.y, rot);
-      Draw.reset();
    }
 
-   /** Both wings, team coloured; p = 0 folded back, 1 spread. */
+   /** All six wings, team coloured; p = 0 folded back, 1 spread. */
    void drawWings(float x, float y, float rot, float p, Team team, float alpha) {
-      Draw.color(team.color, alpha);
-      for (int i = 0; i < 2; ++i) {
-         float a = ROOTS[i][2] * FOLD * (1.0F - p);
-         wingPoint(x, y, rot, i, 128.0F, 128.0F, p, tmp);
-         Draw.rect(this.wingRegions[i], tmp[0], tmp[1], rot + a);
+      this.drawWings(x, y, rot, p, team.color, alpha);
+   }
+
+   void drawWings(float x, float y, float rot, float p, Color tint, float alpha) {
+      // the (grey) wing sprites are multiplied by the team colour, then once more additive so the wings glow in it
+      glow.set(tint);
+      for (int pass = 0; pass < 2; ++pass) {
+         if (pass == 0) {
+            Draw.color(tint, alpha);
+         } else {
+            Draw.blend(Blending.additive);
+            Draw.color(glow, 0.35F * alpha);
+         }
+         for (int i = 0; i < ROOTS.length; ++i) {
+            float a = ROOTS[i][2] * FOLD * (1.0F - p);
+            wingPoint(x, y, rot, i, 128.0F, 128.0F, p, tmp);
+            Draw.rect(this.wingRegions[i], tmp[0], tmp[1], rot + a);
+         }
+         if (pass == 1) Draw.blend();
       }
       Draw.reset();
    }
@@ -165,10 +166,6 @@ public class OphanUnit extends UnitType {
       this.drawWings(x, y, 0.0F, 0.0F, team, alpha);
       Draw.color(Color.white, alpha);
       Draw.rect(this.region, x, y);
-      Draw.rect(this.frontRegion, x, y);
-      Draw.color(team.color, alpha);
-      Draw.rect(this.teamRegion, x, y);
-      Draw.rect(this.frontTeamRegion, x, y);
       Draw.reset();
    }
 
@@ -177,7 +174,7 @@ public class OphanUnit extends UnitType {
       if (t == null) return;
       float p = SeraphAnim.wings(SeraphAnim.age(unit));
       for (int i = 0; i < TIPS.length; ++i) {
-         wingPoint(unit.x, unit.y, unit.rotation - 90.0F, i & 1, TIPS[i][0], TIPS[i][1], p, tmp);
+         wingPoint(unit.x, unit.y, unit.rotation - 90.0F, i, TIPS[i][0], TIPS[i][1], p, tmp);
          t[i].live(tmp[0], tmp[1]);
       }
       enginePoint(unit, tmp);

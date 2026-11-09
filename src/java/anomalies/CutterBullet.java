@@ -51,17 +51,22 @@ public class CutterBullet extends WreckBullet {
    }
 
    public CutterBullet(float speed, float damage, float shardDamage, Color color, float[] angles) {
+      this(speed, damage, shardDamage, color, angles, false);
+   }
+
+   /** straightShards: the shards fly straight at constant speed (no slowing down, no turning back to the shell). */
+   public CutterBullet(float speed, float damage, float shardDamage, Color color, float[] angles, boolean straightShards) {
       super(speed, damage, color);
       this.angles = angles;
       this.spriteName = "anomalies-cutter-bullet";
       this.spin = false;
       this.spriteScale = 1.25F;
       this.lifetime = 30.0F;
-      this.shard = new Shard(4.6F, shardDamage, color);
+      this.shard = straightShards ? new WreckBullet(4.6F, shardDamage, color) : new Shard(4.6F, shardDamage, color);
       this.shard.spriteName = "anomalies-cutter-shard";
       this.shard.spin = false;
       this.shard.spriteScale = 1.1F;
-      this.shard.lifetime = APART_TIME + HOME_TIME;
+      this.shard.lifetime = straightShards ? 36.0F : APART_TIME + HOME_TIME;
       this.shard.hitSize = 4.0F;
       this.shard.trailLength = 6;
       this.shard.trailWidth = 1.1F;

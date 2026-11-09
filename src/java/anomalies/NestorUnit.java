@@ -27,19 +27,19 @@ import mindustry.type.Weapon;
  * Nestor: winged flyer. Sprites share a 256x256 canvas (4 px = 1 world unit), the unit centre is the canvas centre.
  * - nestor.png body, nestor-wing.png wings, nestor-cut-big / nestor-cut-small side cuts (a glowing yellow dot sits in the middle of each),
  *   nestor-cell.png the "cell" in the rear slit (the engine flame comes out under it);
- * - centre slit: an alpha ball lightning charges there (reload 2.5 s) and is fired; the whole craft kicks back a little,
- * - 4 side guns (nestor-gun-side, nestor-gun-mid), rotate freely, yellow Stell-style bolts, reload 1.5 s, recoil,
+ * - centre slit: an alpha ball lightning charges there (reload 1.25 s) and is fired; the whole craft kicks back a little,
+ * - 4 side guns (nestor-gun-side, nestor-gun-mid), rotate freely, yellow Stell-style bolts, reload 0.75 s, recoil,
  * - 2 small static front guns (nestor-gun-front), Cutter shell with 2 shards, reload 2 s, recoil.
  * The whole rear line leaves one wide, solid trail band.
  */
 public class NestorUnit extends UnitType {
    static final float CENTER = 128.0F;
-   /** reloads in ticks: centre 2.5 s, side guns 1.5 s, front guns 2 s */
-   static final float RELOAD_CENTER = 150.0F, RELOAD_SIDE = 90.0F, RELOAD_FRONT = 120.0F;
+   /** reloads in ticks (twice as fast as before): centre 1.25 s, side guns 0.75 s, front guns 1 s */
+   static final float RELOAD_CENTER = 75.0F, RELOAD_SIDE = 45.0F, RELOAD_FRONT = 60.0F;
    /** how far the hull kicks back at the ball shot, world units */
    static final float KICK = 2.0F;
-   /** where the ball charges in the centre slit, sprite pixels (y down) */
-   static final float[] ORB = new float[]{128.0F, 98.0F};
+   /** where the ball charges: the middle of the centre cut (notch bottom y=108, wing tips y=52), sprite pixels (y down) */
+   static final float[] ORB = new float[]{128.0F, 80.0F};
    /** the engine flame: the rear slit under the cell, sprite pixels (y down) */
    static final float[] ENGINE = new float[]{128.0F, 151.0F};
    static final float ENGINE_RADIUS = 1.8F;
@@ -219,6 +219,17 @@ public class NestorUnit extends UnitType {
          Draw.rect(this.wingRegion, unit.x, unit.y, rot);
          Draw.reset();
 
+         // the wings glow: the same sprite once more, additive, in the Nestor yellow, with a soft pulse
+         float pulse = 0.85F + 0.15F * Mathf.sin(Time.time * 0.1F + unit.id);
+         Draw.z(z - 0.029F);
+         Draw.blend(Blending.additive);
+         Draw.color(yellow, 0.55F * pulse);
+         Draw.rect(this.wingRegion, unit.x, unit.y, rot);
+         Draw.color(pale, 0.2F * pulse);
+         Draw.rect(this.wingRegion, unit.x, unit.y, rot);
+         Draw.blend();
+         Draw.reset();
+
          // hull and the guns (drawn by the weapons, with their recoil)
          TurretPatch.shadowOff();
          try {
@@ -229,7 +240,7 @@ public class NestorUnit extends UnitType {
 
          Draw.z(z + 0.01F);
          // the cell works like the standard one: dark when damaged, pulsing, otherwise the team colour
-         Draw.color(this.cellColor(unit));
+         Draw.color(TeamTint.cell(unit));
          Draw.rect(this.cellRegion, unit.x, unit.y, rot);
          Draw.reset();
          this.drawOrb(unit, z);

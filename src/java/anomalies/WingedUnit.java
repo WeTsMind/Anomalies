@@ -98,7 +98,7 @@ public class WingedUnit extends UnitType {
 
       // wings, white -> team colour
       Draw.z(z - 0.03F);
-      Draw.color(unit.team.color);
+      Draw.color(TeamTint.cell(unit));
       Draw.rect(this.wingRegion, unit.x, unit.y, rot);
       Draw.rect(this.tipRegion, unit.x, unit.y, rot);
       Draw.reset();
@@ -109,7 +109,7 @@ public class WingedUnit extends UnitType {
 
       // team-colour details on the body
       Draw.z(z + 0.01F);
-      Draw.color(unit.team.color);
+      Draw.color(TeamTint.cell(unit));
       Draw.rect(this.teamRegion, unit.x, unit.y, rot);
       Draw.reset();
    }
