@@ -208,7 +208,7 @@ public class GeraniumUnit extends UnitType {
    static void tipPoint(Unit unit, int i, float[] out) {
       int side = i & 1; // the rear wings sit on the same pivots as the front ones
       float pxl = (WING_PIVOT[side][0] - CENTER) / 4.0F, pyl = (CENTER - WING_PIVOT[side][1]) / 4.0F;
-      float dx = (WING_TIPS[i][0] - WING_PIVOT[i][0]) / 4.0F, dy = (WING_PIVOT[i][1] - WING_TIPS[i][1]) / 4.0F;
+      float dx = (WING_TIPS[i][0] - WING_PIVOT[side][0]) / 4.0F, dy = (WING_PIVOT[side][1] - WING_TIPS[i][1]) / 4.0F;
       float turn = side == 0 ? -WING_TURN : WING_TURN;
       float tc = Mathf.cosDeg(turn), ts = Mathf.sinDeg(turn);
       float lx = pxl + dx * tc - dy * ts;
@@ -231,7 +231,7 @@ public class GeraniumUnit extends UnitType {
       } else {
          Draw.z(z - 0.029F);
          Draw.blend(Blending.additive);
-         Draw.color(Color.white, 0.5F * pulse);
+         Draw.color(Color.white, 0.25F * pulse);
       }
       for (int i = 0; i < 2; ++i) {
          if (this.wingRegions[i] == null) continue;

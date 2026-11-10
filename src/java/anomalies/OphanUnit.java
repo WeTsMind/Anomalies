@@ -142,22 +142,15 @@ public class OphanUnit extends UnitType {
    }
 
    void drawWings(float x, float y, float rot, float p, Color tint, float alpha) {
-      // the (grey) wing sprites are multiplied by the team colour, then once more additive so the wings glow in it
-      glow.set(tint);
-      for (int pass = 0; pass < 2; ++pass) {
-         if (pass == 0) {
-            Draw.color(tint, alpha);
-         } else {
-            Draw.blend(Blending.additive);
-            Draw.color(glow, 0.35F * alpha);
-         }
-         for (int i = 0; i < ROOTS.length; ++i) {
-            float a = ROOTS[i][2] * FOLD * (1.0F - p);
-            wingPoint(x, y, rot, i, 128.0F, 128.0F, p, tmp);
-            Draw.rect(this.wingRegions[i], tmp[0], tmp[1], rot + a);
-         }
-         if (pass == 1) Draw.blend();
+      // semi-transparent glowing wings: the (grey) sprites drawn additive in the team colour
+      Draw.blend(Blending.additive);
+      Draw.color(tint, 0.5F * alpha);
+      for (int i = 0; i < ROOTS.length; ++i) {
+         float a = ROOTS[i][2] * FOLD * (1.0F - p);
+         wingPoint(x, y, rot, i, 128.0F, 128.0F, p, tmp);
+         Draw.rect(this.wingRegions[i], tmp[0], tmp[1], rot + a);
       }
+      Draw.blend();
       Draw.reset();
    }
 

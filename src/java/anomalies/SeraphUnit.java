@@ -32,10 +32,10 @@ public class SeraphUnit extends UnitType {
    /** the sprites share one 256x256 canvas (4 px = 1 world unit); the unit centre is the canvas centre */
    static final float CENTER = 128.0F;
    // wing root in sprite pixels (256x256, y down) and fold side (+1 left, -1 right): front (big) wings left / right, rear (small) wings left / right
-   static final float[][] WINGS = new float[][]{{115.0F, 117.0F, 1.0F}, {141.0F, 117.0F, -1.0F}, {119.0F, 140.0F, 1.0F}, {137.0F, 140.0F, -1.0F}};
+   static final float[][] WINGS = new float[][]{{115.0F, 119.0F, 1.0F}, {141.0F, 119.0F, -1.0F}, {119.0F, 137.0F, 1.0F}, {137.0F, 137.0F, -1.0F}};
    static final float FOLD = 36.0F;
    // wing tips (sprite px): the outer lower corners, where the trails start
-   static final float[][] TIPS = new float[][]{{73.5F, 153.5F}, {182.5F, 153.5F}, {88.0F, 162.5F}, {168.0F, 162.5F}};
+   static final float[][] TIPS = new float[][]{{73.5F, 155.5F}, {182.5F, 155.5F}, {88.0F, 159.5F}, {168.0F, 159.5F}};
    static final Color ENGINE = Color.valueOf("ffd633");
    /** the wings and their trails are painted in the team colour */
    static final Color tail = new Color(), head = new Color(), core = new Color(), glow = new Color();
@@ -69,7 +69,7 @@ public class SeraphUnit extends UnitType {
       this.mineFloor = true;
       this.mineWalls = false;
       this.itemCapacity = 30;
-      this.engineOffset = 6.25F; // flame starts right under the cell (5.5 units below the centre), not in the air behind the body
+      this.engineOffset = 5.25F; // flame starts right under the cell (4.5 units below the centre), not in the air behind the body
       this.engineSize = 1.4F;
       // sharp engine trail: the game's own tapered trail behind the rear flame
       this.engineColor = ENGINE;
@@ -87,6 +87,7 @@ public class SeraphUnit extends UnitType {
       gun.mirror = true;
       gun.alternate = true;
       gun.rotate = false;
+      gun.layerOffset = -0.002F; // under the hull (above the wings), like the front guns of the Nestor
       gun.reload = 60.0F;
       gun.recoil = 1.0F;
       gun.recoilTime = 10.0F;
@@ -207,7 +208,7 @@ public class SeraphUnit extends UnitType {
          float var15 = var8 + var13 * var11 - var14 * var12;
          float var16 = var9 + var13 * var12 + var14 * var11;
          Draw.blend(Blending.additive);
-         Draw.color(TeamTint.cell(var1), 0.55F * var17);
+         Draw.color(TeamTint.cell(var1), 0.3F * var17);
          Draw.rect(this.wingRegions[var7], var1.x + var15 * var5 - var16 * var6, var1.y + var15 * var6 + var16 * var5, var4 + var10);
       }
 
@@ -218,9 +219,9 @@ public class SeraphUnit extends UnitType {
       for(int var19 = 0; var19 < 4; ++var19) {
          float var20 = WINGS[var19][2] * 36.0F * (1.0F - var2);
          wingPoint(var1, var19, CENTER, CENTER, var2, tmp);
-         Draw.color(glow, 0.8F * var18 * var17);
+         Draw.color(glow, 0.45F * var18 * var17);
          Draw.rect(this.wingRegions[var19], tmp[0], tmp[1], var4 + var20);
-         Draw.color(glow, 0.32F * var18 * var17);
+         Draw.color(glow, 0.14F * var18 * var17);
          Draw.rect(this.wingRegions[var19], tmp[0], tmp[1], 72.0F, 72.0F, var4 + var20);
       }
 

@@ -113,7 +113,7 @@ public class SeraphCore extends CoreBlock {
       void drawSeraph(float var1) {
          // the wings are painted in the team colour (and glow, like the flying unit)
          Draw.blend(Blending.additive);
-         Draw.color(this.team.color, 0.7F * var1);
+         Draw.color(this.team.color, 0.4F * var1);
 
          for(int var2 = 0; var2 < 4; ++var2) {
             float var3 = (SeraphUnit.WINGS[var2][0] - SeraphUnit.CENTER) / 4.0F;

@@ -223,9 +223,9 @@ public class NestorUnit extends UnitType {
          float pulse = 0.85F + 0.15F * Mathf.sin(Time.time * 0.1F + unit.id);
          Draw.z(z - 0.029F);
          Draw.blend(Blending.additive);
-         Draw.color(yellow, 0.55F * pulse);
+         Draw.color(yellow, 0.3F * pulse);
          Draw.rect(this.wingRegion, unit.x, unit.y, rot);
-         Draw.color(pale, 0.2F * pulse);
+         Draw.color(pale, 0.1F * pulse);
          Draw.rect(this.wingRegion, unit.x, unit.y, rot);
          Draw.blend();
          Draw.reset();

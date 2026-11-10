@@ -158,7 +158,7 @@ public class CrocusUnit extends UnitType {
       float pulse = 0.85F + 0.15F * Mathf.sin(Time.time * 0.1F + unit.id);
       Draw.z(z - 0.029F);
       Draw.blend(Blending.additive);
-      Draw.color(Color.white, 0.5F * pulse);
+      Draw.color(Color.white, 0.25F * pulse);
       Draw.rect(this.wingRegion, unit.x, unit.y, rot);
       Draw.blend();
       Draw.reset();

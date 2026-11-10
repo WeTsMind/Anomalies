@@ -379,9 +379,37 @@ public class AnomalyHunter extends UnitType {
       final float[] state = new float[3];
       Anomaly target;
       float beam;
+      /** time spent flying towards the current target without getting in range, and how close the hunter has got in the current check window */
+      float chase, windowBest = Float.MAX_VALUE, lastWindowBest = Float.MAX_VALUE;
+      /** anomalies that could not be reached: ignored until the given time (Time.time) */
+      final java.util.HashMap<Anomaly, Float> ignored = new java.util.HashMap<>();
+      /** every CHECK ticks out of range the hunter must have come at least MIN_GAIN closer, otherwise the anomaly counts as unreachable */
+      static final float CHECK = 150.0F, MIN_GAIN = 10.0F, IGNORE_TIME = 3600.0F;
 
       boolean valid(Anomaly var1) {
-         return AnomalyHunter.validTarget(var1);
+         if (!AnomalyHunter.validTarget(var1)) return false;
+         Float until = this.ignored.get(var1);
+         if (until == null) return true;
+         if (Time.time >= until) {
+            this.ignored.remove(var1); // try again later, the situation may have changed
+            return true;
+         }
+         return false;
+      }
+
+      void giveUp() {
+         if (this.target != null) this.ignored.put(this.target, Time.time + IGNORE_TIME);
+         this.target = null;
+         this.beam = 0.0F;
+         this.resetChase();
+         AnomalyHunter.beams.remove(this.unit);
+         this.ignored.keySet().removeIf(a -> a.dead);
+      }
+
+      void resetChase() {
+         this.chase = 0.0F;
+         this.windowBest = Float.MAX_VALUE;
+         this.lastWindowBest = Float.MAX_VALUE;
       }
 
       public void updateUnit() {
@@ -400,6 +428,7 @@ public class AnomalyHunter extends UnitType {
                }
 
                this.beam = 0.0F;
+               this.resetChase();
             }
 
             if (this.target == null) {
@@ -417,9 +446,27 @@ public class AnomalyHunter extends UnitType {
                   this.state[1] = this.target.y;
                   this.state[2] = Math.min(1.0F, this.beam / 20.0F);
                   AnomalyHunter.beams.put(this.unit, this.state);
+                  this.resetChase();
                } else {
                   this.beam = Math.max(0.0F, this.beam - Time.delta * 2.0F);
                   AnomalyHunter.beams.remove(this.unit);
+                  // not in range yet: if it keeps failing to get closer (the anomaly is too close to the enemy landing, behind
+                  // something it cannot pass...) the hunter gives up on this one and goes for the next
+                  if (var6 <= 121.0F) {
+                     this.resetChase(); // close enough, it is just turning towards the target
+                  } else {
+                     this.chase += Time.delta;
+                     this.windowBest = Math.min(this.windowBest, var6);
+                  }
+                  if (this.chase >= CHECK) {
+                     if (this.lastWindowBest - this.windowBest < MIN_GAIN && this.lastWindowBest != Float.MAX_VALUE) {
+                        this.giveUp();
+                        return;
+                     }
+                     this.lastWindowBest = this.windowBest;
+                     this.windowBest = Float.MAX_VALUE;
+                     this.chase = 0.0F;
+                  }
                }
 
                if (this.beam >= AnomalyHunter.killTime) {
