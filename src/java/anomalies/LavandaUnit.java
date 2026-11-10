@@ -7,15 +7,15 @@ import arc.graphics.g2d.TextureRegion;
 import mindustry.content.Fx;
 import mindustry.entities.part.HoverPart;
 import mindustry.gen.Unit;
-import mindustry.gen.UnitEntity;
+import mindustry.gen.ElevationMoveUnit;
 import mindustry.graphics.Layer;
 import mindustry.type.UnitType;
 import mindustry.type.Weapon;
 
 /**
- * Lavanda: a hovering craft. Sprites share a 128x128 canvas (4 px = 1 world unit), the unit centre is the canvas centre.
+ * Lavanda: a ground hover unit (levitates like the Elude). Sprites share a 128x128 canvas (4 px = 1 world unit), the unit centre is the canvas centre.
  * - lavanda.png the hull, lavanda-mid.png the middle piece drawn over the muzzle root, lavanda-cell.png the cell (team colour,
- *   works like a regular cell), lavanda-gun.png the muzzle (static, it recoils when firing);
+ *   works like a regular cell), lavanda-gun.png the turret with the muzzle (turns around its base, it recoils when firing; the sprite is padded so that its centre is the pivot);
  * - 3 hover rings per side (same effect as the Elude), at the red dots of the reference picture;
  * - fires violet glowing bullets (60 damage) that break into 3 glowing shards (20 damage each) on a hit.
  */
@@ -26,35 +26,35 @@ public class LavandaUnit extends UnitType {
 
    public LavandaUnit(String name) {
       super(name);
-      this.constructor = UnitEntity::create;
+      this.constructor = ElevationMoveUnit::create; // the same kind of ground hover unit as the Elude
       this.alwaysUnlocked = true;
-      this.flying = true;
-      this.lowAltitude = true;
+      this.flying = false;
+      this.hovering = true; // levitates over the ground (and over deep water) without drowning
+      this.canDrown = false;
       this.health = 700.0F;
       this.armor = 2.0F;
-      this.speed = 2.0F;
-      this.accel = 0.08F;
-      this.drag = 0.04F;
+      this.speed = 1.0F;
       this.hitSize = 14.0F;
       this.rotateSpeed = 5.0F;
-      this.faceTarget = true; // the muzzle does not turn: the craft aims
+      this.faceTarget = false; // the turret turns by itself, the hull keeps facing where it moves
       this.targetAir = true;
       this.targetGround = true;
       this.outlines = false;
       this.drawCell = false;
-      this.engineSize = 0.0F; // it levitates: no engine flame
+      this.engineSize = 0.0F;
 
-      // the muzzle: static, small recoil
+      // the turret: turns freely around its base (the sprite is padded so that its centre is the pivot), small recoil
       Weapon gun = new Weapon("anomalies-lavanda-gun");
       gun.x = 0.0F;
-      gun.y = 5.0F;
-      gun.shootY = 2.75F;
+      gun.y = 2.75F;
+      gun.shootY = 5.0F;
       gun.mirror = false;
-      gun.rotate = false;
+      gun.rotate = true;
+      gun.rotateSpeed = 8.0F;
       gun.reload = 40.0F;
       gun.recoil = 2.0F;
       gun.recoilTime = 16.0F;
-      gun.shootCone = 15.0F;
+      gun.shootCone = 8.0F;
       gun.ejectEffect = Fx.none;
       gun.shootSound = ModSounds.lavandaShot();
       gun.bullet = new LavandaShot();
@@ -99,7 +99,7 @@ public class LavandaUnit extends UnitType {
    }
 
    public void draw(Unit unit) {
-      float z = unit.elevation > 0.5F ? (this.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit) : this.groundLayer;
+      float z = unit.elevation > 0.5F ? Layer.flyingUnitLow : this.groundLayer;
       float rot = unit.rotation - 90.0F;
 
       // hull, muzzle (with its recoil) and hover rings
