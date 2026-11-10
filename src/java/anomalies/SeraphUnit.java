@@ -79,7 +79,7 @@ public class SeraphUnit extends UnitType {
       this.outlines = false;
 
       // two small guns on the shoulders of the hull: they fire in turn (1, 2, 1, 2) every 0.5 s, each one every 1 s.
-      // The shell throws shards like the Cutter, but the shards fly straight.
+      // The shot is the Cutter shard sprite with a trail, flying straight in the direction of the unit.
       Weapon gun = new Weapon("anomalies-seraph-gun");
       gun.x = 3.5F;
       gun.y = 3.125F;
@@ -94,8 +94,14 @@ public class SeraphUnit extends UnitType {
       gun.shootCone = 20.0F;
       gun.ejectEffect = Fx.none;
       gun.shootSound = ModSounds.cutterShot();
-      CutterBullet shell = new CutterBullet(6.5F, 10.0F, 4.0F, Color.valueOf("ffd27f"), CutterBullet.SHARD_ANGLES, true);
-      shell.lifetime = 26.0F;
+      WreckBullet shell = new WreckBullet(5.0F, 10.0F, Color.valueOf("ffd27f"));
+      shell.spriteName = "anomalies-cutter-shard"; // just the shard sprite with a trail, flying straight ahead
+      shell.spin = false;
+      shell.spriteScale = 1.1F;
+      shell.hitSize = 4.0F;
+      shell.trailLength = 9;
+      shell.trailWidth = 1.2F;
+      shell.lifetime = 30.0F;
       gun.bullet = shell;
       this.weapons.add(gun);
    }

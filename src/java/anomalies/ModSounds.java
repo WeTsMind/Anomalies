@@ -27,6 +27,10 @@ public class ModSounds {
       return get("demolisher-shot", Sounds.shoot);
    }
 
+   public static Sound lavandaShot() {
+      return get("lavanda-shot", Sounds.shoot);
+   }
+
    public static Sound empPulse() {
       return get("emp-pulse", Sounds.none);
    }

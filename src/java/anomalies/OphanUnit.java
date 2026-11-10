@@ -142,13 +142,24 @@ public class OphanUnit extends UnitType {
    }
 
    void drawWings(float x, float y, float rot, float p, Color tint, float alpha) {
-      // semi-transparent glowing wings: the (grey) sprites drawn additive in the team colour
-      Draw.blend(Blending.additive);
-      Draw.color(tint, 0.5F * alpha);
-      for (int i = 0; i < ROOTS.length; ++i) {
-         float a = ROOTS[i][2] * FOLD * (1.0F - p);
-         wingPoint(x, y, rot, i, 128.0F, 128.0F, p, tmp);
-         Draw.rect(this.wingRegions[i], tmp[0], tmp[1], rot + a);
+      // the wings are semi-transparent but solid-looking in the team colour (normal blending), and glow on top of that: an additive pass of the
+      // same sprites plus a slightly larger, fainter one as a halo
+      for (int pass = 0; pass < 3; ++pass) {
+         if (pass == 0) {
+            Draw.color(tint, 0.62F * alpha);
+         } else {
+            Draw.blend(Blending.additive);
+            Draw.color(tint, (pass == 1 ? 0.4F : 0.16F) * alpha);
+         }
+         for (int i = 0; i < ROOTS.length; ++i) {
+            float a = ROOTS[i][2] * FOLD * (1.0F - p);
+            wingPoint(x, y, rot, i, 128.0F, 128.0F, p, tmp);
+            if (pass == 2) {
+               Draw.rect(this.wingRegions[i], tmp[0], tmp[1], 72.0F, 72.0F, rot + a);
+            } else {
+               Draw.rect(this.wingRegions[i], tmp[0], tmp[1], rot + a);
+            }
+         }
       }
       Draw.blend();
       Draw.reset();
