@@ -23,7 +23,7 @@ public class Test01Unit extends UnitType {
    /** distance from the previous segment centre to this one (the first one is measured from the head centre) */
    static final float[] DIST = {4.625F, 2.875F, 3.125F, 4.25F, 4.125F, 4.25F, 3.0F, 3.0F, 6.25F};
    /** how fast a segment follows the previous one (bigger = stiffer) */
-   static final float[] FOLLOW = {0.30F, 0.26F, 0.24F, 0.22F, 0.2F, 0.18F, 0.16F, 0.14F, 0.12F};
+   static final float[] FOLLOW = {0.14F, 0.12F, 0.11F, 0.10F, 0.09F, 0.08F, 0.07F, 0.06F, 0.05F};
    TextureRegion[] segs = new TextureRegion[SEG.length];
    TextureRegion head, headTop;
    static final WeakHashMap<Unit, float[]> ANGLES = new WeakHashMap<>();

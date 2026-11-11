@@ -4,6 +4,7 @@ import arc.Core;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
+import arc.math.Mathf;
 import mindustry.content.Fx;
 import mindustry.entities.part.HoverPart;
 import mindustry.gen.Unit;
@@ -22,6 +23,8 @@ import mindustry.type.Weapon;
 public class LavandaUnit extends UnitType {
    /** hover ring positions (local units: x to the side, y forward): front, middle, rear */
    static final float[][] HOVER = new float[][]{{3.1F, 7.8F}, {5.3F, 0.4F}, {3.4F, -7.45F}};
+   /** turret pivot along the hull axis (world units) */
+   static final float PIVOT_Y = -0.25F;
    TextureRegion midRegion, cellRegion;
 
    public LavandaUnit(String name) {
@@ -46,8 +49,8 @@ public class LavandaUnit extends UnitType {
       // the turret: turns freely around its base (the sprite is padded so that its centre is the pivot), small recoil
       Weapon gun = new Weapon("anomalies-lavanda-gun");
       gun.x = 0.0F;
-      gun.y = 2.75F;
-      gun.shootY = 5.0F;
+      gun.y = -0.25F; // the pivot is the centre of the turret (the middle piece)
+      gun.shootY = 8.0F;
       gun.mirror = false;
       gun.rotate = true;
       gun.rotateSpeed = 8.0F;
@@ -110,12 +113,16 @@ public class LavandaUnit extends UnitType {
          TurretPatch.shadowOn();
       }
 
-      // middle piece over the root of the muzzle, then the cell on top: dark when damaged, pulsing, otherwise the team colour
+      // the turret (middle piece + cell) turns together with the muzzle around the same pivot; the cell is dark when damaged, pulsing, otherwise the team colour
+      float tr = rot;
+      if (unit.mounts.length > 0) tr = unit.rotation - 90.0F + unit.mounts[0].rotation;
+      float tx = unit.x + Mathf.cosDeg(unit.rotation) * PIVOT_Y;
+      float ty = unit.y + Mathf.sinDeg(unit.rotation) * PIVOT_Y;
       Draw.z(z + 0.01F);
-      Draw.rect(this.midRegion, unit.x, unit.y, rot);
+      Draw.rect(this.midRegion, tx, ty, tr);
       Draw.z(z + 0.011F);
       Draw.color(TeamTint.cell(unit));
-      Draw.rect(this.cellRegion, unit.x, unit.y, rot);
+      Draw.rect(this.cellRegion, tx, ty, tr);
       Draw.reset();
    }
 }
