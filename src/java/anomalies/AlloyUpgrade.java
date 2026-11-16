@@ -27,6 +27,7 @@ import java.lang.reflect.Field;
  * Upgrade cost: 100 surge alloy, 200 silicon, 150 titanium, 35 plastanium.
  * Geranium is an upgrade of Crocus in the regular (vanilla) Additive Reconstructor.
  * Upgrade cost: 100 silicon, 10 surge alloy, 30 graphite, 60 gold nuggets.
+ * Gvozdika is an upgrade of Lavanda in the regular (vanilla) Additive Reconstructor, at the vanilla cost.
  * All other units keep the vanilla cost of their reconstructor.
  */
 public class AlloyUpgrade {
@@ -35,6 +36,8 @@ public class AlloyUpgrade {
    static final String ARUX = "anomalies-arux";
    static final String CROCUS = "anomalies-crocus";
    static final String GERANIUM = "anomalies-geranium";
+   static final String LAVANDA = "anomalies-lavanda";
+   static final String GVOZDIKA = "anomalies-gvozdika";
 
    public static ItemStack[] VANILLA_COST = ItemStack.with(new Object[]{Items.silicon, 40, Items.graphite, 40});
    public static ItemStack[] VANILLA_COST_MULTI = ItemStack.with(new Object[]{Items.silicon, 130, Items.titanium, 80, Items.metaglass, 40});
@@ -91,6 +94,7 @@ public class AlloyUpgrade {
       add(Blocks.additiveReconstructor, GOLDEN, ALLOY, ALLOY_COST);
       add(Blocks.additiveReconstructor, CROCUS, GERANIUM, geraniumCost());
       add(Blocks.multiplicativeReconstructor, ALLOY, ARUX, ARUX_COST);
+      add(Blocks.additiveReconstructor, LAVANDA, GVOZDIKA, VANILLA_COST);
    }
 
    static void add(Block block, String from, String to, ItemStack[] cost) {
