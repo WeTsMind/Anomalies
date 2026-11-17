@@ -123,7 +123,7 @@ public class ArUxUnit extends UnitType {
             float wr = base + mount.rotation;
             float wx = unit.x + Angles.trnsx(base, this.x, this.y);
             float wy = unit.y + Angles.trnsy(base, this.x, this.y);
-            Draw.z(z + this.layerOffset + 0.001F);
+            Draw.z(z + this.layerOffset); // right after the cannon, on its layer (see UnitZ)
             Draw.color(TeamTint.cell(unit));
             Draw.rect(type.cannonTeam, wx, wy, wr);
             Draw.reset();

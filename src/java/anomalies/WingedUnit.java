@@ -92,12 +92,13 @@ public class WingedUnit extends UnitType {
    }
 
    public void draw(Unit unit) {
-      float z = unit.elevation > 0.5F ? (this.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit) : this.groundLayer;
+      // every piece goes on the body layer, in drawing order (see UnitZ); only the trails lie below the units
+      float z = UnitZ.of(this, unit);
       float rot = unit.rotation - 90.0F;
       this.drawTrails(unit, z);
 
       // wings, white -> team colour
-      Draw.z(z - 0.03F);
+      Draw.z(z);
       Draw.color(TeamTint.cell(unit));
       Draw.rect(this.wingRegion, unit.x, unit.y, rot);
       Draw.rect(this.tipRegion, unit.x, unit.y, rot);
@@ -108,7 +109,7 @@ public class WingedUnit extends UnitType {
       this.drawBlades(unit, z);
 
       // team-colour details on the body
-      Draw.z(z + 0.01F);
+      Draw.z(z);
       Draw.color(TeamTint.cell(unit));
       Draw.rect(this.teamRegion, unit.x, unit.y, rot);
       Draw.reset();
@@ -121,7 +122,7 @@ public class WingedUnit extends UnitType {
       float base = unit.rotation - 90.0F;
       float c = Mathf.cosDeg(base), s = Mathf.sinDeg(base);
       Draw.reset();
-      Draw.z(z + 0.005F);
+      Draw.z(z);
       for (int i = 0; i < 2; ++i) {
          float lx = BLADE_CLOSED[i] / 4.0F * (1.0F - open);
          Draw.rect(this.bladeRegions[i], unit.x + lx * c, unit.y + lx * s, base);

@@ -184,6 +184,18 @@ public class SeraphUnit extends UnitType {
    public void drawSoftShadow(float x, float y, float rotation, float alpha) {
    }
 
+   /** the gun under the hull is drawn right before the hull, on its layer (see UnitZ.drawUnderWeapons) */
+   @Override
+   public void drawBody(Unit unit) {
+      UnitZ.drawUnderWeapons(this, unit);
+      super.drawBody(unit);
+   }
+
+   @Override
+   public void drawWeapons(Unit unit) {
+      UnitZ.drawTopWeapons(this, unit);
+   }
+
    public void draw(Unit var1) {
       float var2 = SeraphAnim.age(var1);
       if (var2 < SeraphAnim.OPEN_END) return;
@@ -197,8 +209,9 @@ public class SeraphUnit extends UnitType {
    }
 
    void drawWings(Unit var1, float var2, float var17) {
-      float var3 = var1.elevation > 0.5F ? (this.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit) : this.groundLayer;
-      Draw.z(var3 - 0.03F);
+      // the wings go on the body layer, before the body (see UnitZ)
+      float var3 = UnitZ.of(this, var1);
+      Draw.z(var3);
       float var4 = var1.rotation - 90.0F;
       float var5 = Mathf.cosDeg(var4);
       float var6 = Mathf.sinDeg(var4);

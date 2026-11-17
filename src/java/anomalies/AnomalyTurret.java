@@ -120,7 +120,9 @@ public class AnomalyTurret extends PowerTurret {
          this.glowFade = Mathf.lerpDelta(this.glowFade, this.power == null ? 0.0F : Mathf.clamp(this.power.status), 0.03F);
          float powered = this.glowFade * this.glowFade * (3.0F - 2.0F * this.glowFade);
          var6 *= powered;
-         Draw.z(51.0F);
+         // the glowing core goes on the head layer (Layer.turret = 50), right after the head: over its own head, but never over
+         // the head of a neighbouring turret
+         Draw.z(50.0F);
          Draw.blend(Blending.additive);
          if (powered > 0.01F) {
             Draw.alpha(var6);

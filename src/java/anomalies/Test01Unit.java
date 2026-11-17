@@ -104,14 +104,12 @@ public class Test01Unit extends UnitType {
       }
 
       float z = Layer.flyingUnit;
-      // from the tail up to the head
+      // from the tail up to the head, all on one layer in drawing order (see UnitZ): the chain never mixes with another unit
+      Draw.z(z);
       for (int i = SEG.length - 1; i >= 0; --i) {
-         Draw.z(z + 0.0001F * (SEG.length - i));
          part(this.segs[i], px[i], py[i], a[i]);
       }
-      Draw.z(z + 0.002F);
       part(this.headTop, unit.x, unit.y, unit.rotation);
-      Draw.z(z + 0.0021F);
       part(this.head, unit.x, unit.y, unit.rotation);
       Draw.reset();
    }

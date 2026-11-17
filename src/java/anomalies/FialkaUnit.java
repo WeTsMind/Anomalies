@@ -23,8 +23,9 @@ import java.util.WeakHashMap;
  * piece is centred on its own pivot:
  * - fialka.png the body, fialka-cell.png the cell (team colour);
  * - fialka-leg-0..5.png the legs (left front, left middle, left rear, right front, right middle, right rear): while the unit moves
- *   each leg turns 10 degrees backwards around the point where it enters the body; a hover ring (the Elude effect) sits under every
- *   leg foot and moves with it;
+ *   each leg turns 30 degrees backwards around the point where it enters the body, and while the unit turns all legs swing
+ *   up to 30 degrees towards the turn (turning left: all of them to the left, and the other way round); a hover ring (the Elude
+ *   effect) sits under every leg foot and moves with it;
  * - fialka-gun.png the barrel of the main gun (turns, recoils), fialka-gun-base.png its base drawn on top (turns, no recoil);
  * - fialka-tail-1..3.png the tail segments and fialka-tail-gun.png the tail gun base, a chain that bends like TEST01;
  *   fialka-tail-barrel.png the tail gun muzzle: part of the tail gun base (does not bend), it only recoils.
@@ -37,18 +38,17 @@ public class FialkaUnit extends UnitType {
    static final float[][] LEG_PIVOT = {{-2.0F, 2.0F}, {-2.25F, 0.0F}, {-2.0F, -2.25F}, {2.0F, 2.0F}, {2.25F, 0.0F}, {2.0F, -2.25F}};
    static final float[][] LEG_FOOT = {{-5.68F, 5.68F}, {-8.23F, 0.0F}, {-5.80F, -5.52F}, {5.72F, 5.74F}, {8.31F, 0.0F}, {5.85F, -5.58F}};
    /** how far the legs turn back while moving, degrees */
-   static final float LEG_TILT = 10.0F;
+   static final float LEG_TILT = 30.0F;
+   /** how far all the legs swing towards the side the unit is turning to, degrees (at full turn speed) */
+   static final float LEG_TURN = 30.0F;
    /** where the tail is attached: this far behind the unit centre */
    static final float TAIL_ROOT = 8.0F;
    /** distance from one tail joint to the next (segment 1 -> 2 -> 3 -> gun) */
    static final float[] TAIL_LEN = {4.0F, 3.5F, 2.25F};
    /** how fast each tail piece follows the previous one */
    static final float[] FOLLOW = {0.22F, 0.19F, 0.16F, 0.14F};
-   /**
-    * how much every joint bends when the tail is fully curled: 90 + 30 + 30 + 30 = 180 degrees, so the tail gun looks forward;
-    * the root bends most, so the tail swings out to the left side instead of knotting up behind the body
-    */
-   static final float[] CURL_BEND = {90.0F, 30.0F, 30.0F, 30.0F};
+   /** how much every joint bends when the tail is fully curled: 4 x 45 = 180 degrees, so the tail gun looks forward */
+   static final float[] CURL_BEND = {45.0F, 45.0F, 45.0F, 45.0F};
    /** how far the tail gun may bend towards the target on top of the curl, degrees */
    static final float GUN_BEND = 35.0F;
    /** main gun pivot (behind the unit centre) */
@@ -75,6 +75,10 @@ public class FialkaUnit extends UnitType {
       float kick;
       /** leg tilt while moving, 0..1 */
       float tilt;
+      /** how fast the unit is turning: -1 (right, full speed) .. 1 (left, full speed), smoothed */
+      float turn;
+      /** the unit rotation on the previous update */
+      float lastRot = Float.NaN;
    }
 
    public FialkaUnit(String name) {
@@ -88,7 +92,7 @@ public class FialkaUnit extends UnitType {
       this.armor = 5.0F;
       this.speed = 20.0F * 8.0F / 60.0F; // 20 tiles per second
       this.hitSize = 20.0F;
-      this.rotateSpeed = 5.0F;
+      this.rotateSpeed = 2.5F; // smooth, not jerky turns
       this.faceTarget = true; // the body turns to the target, so the curled tail gun can look at it
       this.targetAir = true;
       this.targetGround = true;
@@ -182,6 +186,10 @@ public class FialkaUnit extends UnitType {
       t.kick = Mathf.approachDelta(t.kick, 0.0F, 1.0F / 14.0F);
       float v = unit.deltaLen() / Math.max(Time.delta, 0.001F);
       t.tilt = Mathf.approachDelta(t.tilt, v > 0.15F ? 1.0F : 0.0F, 1.0F / 10.0F);
+      // turning: the angle the body turned this tick, against the most it can turn (left = positive)
+      float turned = Float.isNaN(t.lastRot) ? 0.0F : signedDiff(unit.rotation, t.lastRot) / Math.max(Time.delta, 0.001F);
+      t.lastRot = unit.rotation;
+      t.turn = Mathf.lerpDelta(t.turn, Mathf.clamp(turned / this.rotateSpeed, -1.0F, 1.0F), 0.15F);
 
       // every piece follows the previous one bent by the curl (to the left: the angle goes down from "back" through "left" to "forward")
       float prev = unit.rotation + 180.0F;
@@ -223,7 +231,8 @@ public class FialkaUnit extends UnitType {
 
    public void draw(Unit unit) {
       boolean payload = !unit.isAdded();
-      float z = payload ? Draw.z() : unit.elevation > 0.5F ? this.flyingLayer : this.groundLayer + Mathf.clamp(this.hitSize / 4000.0F, 0.0F, 0.01F);
+      // every piece goes on the body layer, in drawing order (see UnitZ), so the unit never mixes with other units
+      float z = UnitZ.of(this, unit);
       float rot = unit.rotation - 90.0F;
       Tail t;
       if (payload || TAILS.get(unit) == null) {
@@ -234,16 +243,16 @@ public class FialkaUnit extends UnitType {
       }
       pose(unit, t); // positions follow the drawn (interpolated) unit position
 
-      // hover rings under the feet, then the legs; each leg turns back while moving
+      // hover rings under the feet, then the legs; each leg turns back while moving and all of them swing towards the turn
       for (int i = 0; i < 6; i++) {
-         float side = LEG_PIVOT[i][0] < 0.0F ? 1.0F : -1.0F; // left legs turn counter-clockwise, right legs clockwise
-         float la = rot + side * LEG_TILT * t.tilt;
+         float side = LEG_PIVOT[i][0] < 0.0F ? 1.0F : -1.0F; // backwards: left legs counter-clockwise, right legs clockwise
+         float la = rot + side * LEG_TILT * t.tilt + LEG_TURN * t.turn;
          Tmp.v1.set(LEG_PIVOT[i][0], LEG_PIVOT[i][1]).rotate(rot);
          float px = unit.x + Tmp.v1.x, py = unit.y + Tmp.v1.y;
          Tmp.v2.set(LEG_FOOT[i][0], LEG_FOOT[i][1]).rotate(la);
          float fx = px + Tmp.v2.x, fy = py + Tmp.v2.y;
 
-         Draw.z(z - 0.013F);
+         Draw.z(z - 0.001F); // the glow lies on the ground, under the units (like the Elude hover part)
          Draw.color(HOVER);
          for (int c = 0; c < 2; c++) {
             float fin = (Time.time / 90.0F + c / 2.0F) % 1.0F;
@@ -251,22 +260,24 @@ public class FialkaUnit extends UnitType {
             Lines.poly(fx, fy, 4, 8.0F * fin, unit.rotation);
          }
          Draw.reset();
-         Draw.z(z - 0.012F);
-         Draw.rect(this.legs[i], px, py, la);
+      }
+      Draw.z(z);
+      for (int i = 0; i < 6; i++) {
+         float side = LEG_PIVOT[i][0] < 0.0F ? 1.0F : -1.0F;
+         float la = rot + side * LEG_TILT * t.tilt + LEG_TURN * t.turn;
+         Tmp.v1.set(LEG_PIVOT[i][0], LEG_PIVOT[i][1]).rotate(rot);
+         Draw.rect(this.legs[i], unit.x + Tmp.v1.x, unit.y + Tmp.v1.y, la);
       }
 
-      // the tail: from the root to the gun, every piece on top of the previous one
+      // the tail over the legs: from the root to the gun, every piece on top of the previous one
       for (int i = 0; i < 4; i++) {
-         Draw.z(z - 0.008F + i * 0.0005F);
          Draw.rect(this.tail[i], t.jx[i], t.jy[i], t.ang[i] + 90.0F);
       }
       WeaponMount tm = mount(unit, this.tailGun);
       float tk = tm == null ? 0.0F : (float)Math.pow((double)tm.recoil, 1.8D) * this.tailGun.recoil;
-      Draw.z(z - 0.008F + 4 * 0.0005F);
       Draw.rect(this.tailBarrel, t.jx[3] - Mathf.cosDeg(t.ang[3]) * tk, t.jy[3] - Mathf.sinDeg(t.ang[3]) * tk, t.ang[3] + 90.0F);
 
-      // body, cell and the main gun barrel (with its recoil)
-      Draw.z(z);
+      // body, cell and the main gun barrel (with its recoil), on the same layer, above all of the above
       TurretPatch.shadowOff();
       try {
          super.draw(unit);
@@ -278,7 +289,7 @@ public class FialkaUnit extends UnitType {
       WeaponMount m = mount(unit, this.main);
       float gr = m == null ? rot : rot + m.rotation;
       Tmp.v1.set(0.0F, GUN_Y).rotate(rot);
-      Draw.z(z + 0.001F);
+      Draw.z(z);
       Draw.rect(this.gunBase, unit.x + Tmp.v1.x, unit.y + Tmp.v1.y, gr);
       Draw.reset();
       Draw.z(z);

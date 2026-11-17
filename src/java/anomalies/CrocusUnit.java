@@ -146,22 +146,36 @@ public class CrocusUnit extends UnitType {
       }
    }
 
+   /** the cannon under the hull is drawn right before the hull, on its layer (see UnitZ.drawUnderWeapons) */
+   @Override
+   public void drawBody(Unit unit) {
+      UnitZ.drawUnderWeapons(this, unit);
+      super.drawBody(unit);
+   }
+
+   @Override
+   public void drawWeapons(Unit unit) {
+      UnitZ.drawTopWeapons(this, unit);
+   }
+
    public void draw(Unit unit) {
-      float z = unit.elevation > 0.5F ? (this.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit) : this.groundLayer;
+      // every piece goes on the body layer, in drawing order (see UnitZ); only the trails lie below the units
+      float z = UnitZ.of(this, unit);
       float rot = unit.rotation - 90.0F;
       this.drawTrails(unit, z);
-      this.drawEngineFlames(unit, z);
 
       // wings: in their own colours (no team tint), under the hull, and they glow
-      Draw.z(z - 0.03F);
+      Draw.z(z);
       Draw.rect(this.wingRegion, unit.x, unit.y, rot);
       float pulse = 0.85F + 0.15F * Mathf.sin(Time.time * 0.1F + unit.id);
-      Draw.z(z - 0.029F);
       Draw.blend(Blending.additive);
       Draw.color(Color.white, 0.25F * pulse);
       Draw.rect(this.wingRegion, unit.x, unit.y, rot);
       Draw.blend();
       Draw.reset();
+
+      // the engine flames over the wings, under the hull
+      this.drawEngineFlames(unit, z);
 
       // hull and the cannon (drawn by the weapon, with its recoil)
       super.draw(unit);
@@ -172,7 +186,7 @@ public class CrocusUnit extends UnitType {
       float scale = unit.elevation;
       if (scale <= 0.0F) return;
       float pulse = Mathf.absin(Time.time, 2.0F, ENGINE_RADIUS / 4.0F);
-      Draw.z(z - 0.025F);
+      Draw.z(z);
       for (int i = 0; i < ENGINES.length; ++i) {
          point(unit, ENGINES[i][0], ENGINES[i][1], tmp);
          Draw.color(this.engineColor == null ? unit.team.color : this.engineColor);

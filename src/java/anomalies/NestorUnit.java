@@ -197,8 +197,21 @@ public class NestorUnit extends UnitType {
       }
    }
 
+   /** the front guns under the hull are drawn right before the hull, on its layer (see UnitZ.drawUnderWeapons) */
+   @Override
+   public void drawBody(Unit unit) {
+      UnitZ.drawUnderWeapons(this, unit);
+      super.drawBody(unit);
+   }
+
+   @Override
+   public void drawWeapons(Unit unit) {
+      UnitZ.drawTopWeapons(this, unit);
+   }
+
    public void draw(Unit unit) {
-      float z = unit.elevation > 0.5F ? (this.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit) : this.groundLayer;
+      // every piece goes on the body layer, in drawing order (see UnitZ); only the trail lies below the units
+      float z = UnitZ.of(this, unit);
       float rot = unit.rotation - 90.0F;
       this.drawTrails(unit, z);
 
@@ -209,19 +222,16 @@ public class NestorUnit extends UnitType {
       unit.x = px + ox;
       unit.y = py + oy;
       try {
-         this.drawEngineFlame(unit, z);
-
          // side cuts and wings, under the hull
-         Draw.z(z - 0.04F);
+         Draw.z(z);
          Draw.rect(this.cutBig, unit.x, unit.y, rot);
          Draw.rect(this.cutSmall, unit.x, unit.y, rot);
-         Draw.z(z - 0.03F);
          Draw.rect(this.wingRegion, unit.x, unit.y, rot);
          Draw.reset();
 
          // the wings glow: the same sprite once more, additive, in the Nestor yellow, with a soft pulse
          float pulse = 0.85F + 0.15F * Mathf.sin(Time.time * 0.1F + unit.id);
-         Draw.z(z - 0.029F);
+         Draw.z(z);
          Draw.blend(Blending.additive);
          Draw.color(yellow, 0.3F * pulse);
          Draw.rect(this.wingRegion, unit.x, unit.y, rot);
@@ -229,6 +239,9 @@ public class NestorUnit extends UnitType {
          Draw.rect(this.wingRegion, unit.x, unit.y, rot);
          Draw.blend();
          Draw.reset();
+
+         // the engine flame over the wings, under the hull
+         this.drawEngineFlame(unit, z);
 
          // hull and the guns (drawn by the weapons, with their recoil)
          TurretPatch.shadowOff();
@@ -238,7 +251,7 @@ public class NestorUnit extends UnitType {
             TurretPatch.shadowOn();
          }
 
-         Draw.z(z + 0.01F);
+         Draw.z(z);
          // the cell works like the standard one: dark when damaged, pulsing, otherwise the team colour
          Draw.color(TeamTint.cell(unit));
          Draw.rect(this.cellRegion, unit.x, unit.y, rot);
@@ -258,7 +271,7 @@ public class NestorUnit extends UnitType {
       float flick = 0.9F + 0.1F * Mathf.sin(Time.time * 0.3F + unit.id);
       point(unit, ORB[0], ORB[1], tmp);
       float bx = tmp[0], by = tmp[1];
-      Draw.z(z + 0.011F);
+      Draw.z(z);
       Draw.blend(Blending.additive);
       Draw.color(yellow, (0.18F + 0.2F * ch + 0.3F * flash) * flick);
       Fill.circle(bx, by, r * 1.6F);
@@ -277,7 +290,7 @@ public class NestorUnit extends UnitType {
       if (scale <= 0.0F) return;
       float pulse = Mathf.absin(Time.time, 2.0F, ENGINE_RADIUS / 4.0F);
       point(unit, ENGINE[0], ENGINE[1], tmp);
-      Draw.z(z - 0.025F);
+      Draw.z(z);
       Draw.color(this.engineColor == null ? unit.team.color : this.engineColor);
       Fill.circle(tmp[0], tmp[1], (ENGINE_RADIUS + pulse) * scale);
       Draw.color(Color.white);

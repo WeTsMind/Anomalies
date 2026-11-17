@@ -102,7 +102,7 @@ public class LavandaUnit extends UnitType {
    }
 
    public void draw(Unit unit) {
-      float z = unit.elevation > 0.5F ? Layer.flyingUnitLow : this.groundLayer;
+      float z = UnitZ.of(this, unit); // the body layer: the turret pieces go on it, after the body (see UnitZ)
       float rot = unit.rotation - 90.0F;
 
       // hull, muzzle (with its recoil) and hover rings
@@ -118,9 +118,8 @@ public class LavandaUnit extends UnitType {
       if (unit.mounts.length > 0) tr = unit.rotation - 90.0F + unit.mounts[0].rotation;
       float tx = unit.x + Mathf.cosDeg(unit.rotation) * PIVOT_Y;
       float ty = unit.y + Mathf.sinDeg(unit.rotation) * PIVOT_Y;
-      Draw.z(z + 0.01F);
+      Draw.z(z);
       Draw.rect(this.midRegion, tx, ty, tr);
-      Draw.z(z + 0.011F);
       Draw.color(TeamTint.cell(unit));
       Draw.rect(this.cellRegion, tx, ty, tr);
       Draw.reset();

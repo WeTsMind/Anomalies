@@ -95,10 +95,11 @@ public class DemolisherTurret extends ItemTurret {
          float px = -Mathf.cosDeg(this.rotation) * LOWER, py = -Mathf.sinDeg(this.rotation) * LOWER;
          float k = (float)Math.pow((double)Mathf.clamp(1.0F - (Time.time - this.shotTime) / KICK_TIME), 1.6D) * KICK;
 
-         // the barrel goes between the base and the head
+         // the barrel goes between the base and the head: on the head's own layer, drawn right before the head, so it is always
+         // under its own head but never slips under the head of a neighbouring turret (it used to "come off" the tower)
          float z = Draw.z();
          if (DemolisherTurret.this.barrelRegion != null && DemolisherTurret.this.barrelRegion.found()) {
-            Draw.z(Layer.turret - 0.1F);
+            Draw.z(Layer.turret);
             Draw.rect(DemolisherTurret.this.barrelRegion, this.x - Mathf.cosDeg(this.rotation) * k + px, this.y - Mathf.sinDeg(this.rotation) * k + py, this.rotation - 90.0F);
             Draw.z(z);
          }

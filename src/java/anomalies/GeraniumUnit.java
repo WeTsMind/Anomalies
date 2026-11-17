@@ -161,15 +161,16 @@ public class GeraniumUnit extends UnitType {
    }
 
    public void draw(Unit unit) {
-      float z = unit.elevation > 0.5F ? (this.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit) : this.groundLayer;
+      // every piece goes on the body layer, in drawing order (see UnitZ); only the trails lie below the units
+      float z = UnitZ.of(this, unit);
       float rot = unit.rotation - 90.0F;
       // the whole craft kicks back when it fires
       float k = kick(unit) * KICK;
       float ox = Mathf.cosDeg(unit.rotation + 180.0F) * k, oy = Mathf.sinDeg(unit.rotation + 180.0F) * k;
 
       this.drawTrails(unit, z);
-      this.drawEngineFlames(unit, z, ox, oy);
       this.drawWings(unit, z, rot, ox, oy);
+      this.drawEngineFlames(unit, z, ox, oy); // over the wings, under the hull
 
       // the hull
       float px = unit.x, py = unit.y;
@@ -223,13 +224,12 @@ public class GeraniumUnit extends UnitType {
    void drawWings(Unit unit, float z, float rot, float ox, float oy) {
       float c = Mathf.cosDeg(rot), s = Mathf.sinDeg(rot);
       float pulse = 0.85F + 0.15F * Mathf.sin(Time.time * 0.1F + unit.id);
-      Draw.z(z - 0.03F);
+      Draw.z(z);
       for (int pass = 0; pass < 2; ++pass) {
       // pass 0: the wings in their own colours (no team tint); pass 1: the same sprites once more, additive, so they glow
       if (pass == 0) {
          Draw.color(Color.white);
       } else {
-         Draw.z(z - 0.029F);
          Draw.blend(Blending.additive);
          Draw.color(Color.white, 0.25F * pulse);
       }
@@ -256,7 +256,7 @@ public class GeraniumUnit extends UnitType {
       float scale = unit.elevation;
       if (scale <= 0.0F) return;
       float pulse = Mathf.absin(Time.time, 2.0F, ENGINE_RADIUS / 4.0F);
-      Draw.z(z - 0.025F);
+      Draw.z(z);
       for (int i = 0; i < ENGINES.length; ++i) {
          point(unit, ENGINES[i][0], ENGINES[i][1], tmp);
          Draw.color(this.engineColor == null ? unit.team.color : this.engineColor);
@@ -276,7 +276,7 @@ public class GeraniumUnit extends UnitType {
       float flick = 0.9F + 0.1F * Mathf.sin(Time.time * 0.3F + unit.id);
       point(unit, ORB[0], ORB[1], tmp);
       float bx = tmp[0] + ox, by = tmp[1] + oy;
-      Draw.z(z + 0.01F);
+      Draw.z(z);
       Draw.blend(Blending.additive);
       Draw.color(orbGlow, (0.18F + 0.2F * ch + 0.3F * flash) * flick);
       Fill.circle(bx, by, r * 1.6F);

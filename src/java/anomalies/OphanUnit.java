@@ -127,10 +127,11 @@ public class OphanUnit extends UnitType {
       float age = SeraphAnim.age(unit);
       if (age < SeraphAnim.OPEN_END) return; // still inside the core, the core draws it
       float p = SeraphAnim.wings(age);
-      float z = unit.elevation > 0.5F ? (this.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit) : this.groundLayer;
+      // the wings go on the body layer, before the body (see UnitZ); only the trails lie below the units
+      float z = UnitZ.of(this, unit);
       float rot = unit.rotation - 90.0F;
       this.drawTrails(unit, z);
-      Draw.z(z - 0.03F);
+      Draw.z(z);
       this.drawWings(unit.x, unit.y, rot, p, TeamTint.cell(unit), 1.0F);
 
       super.draw(unit);

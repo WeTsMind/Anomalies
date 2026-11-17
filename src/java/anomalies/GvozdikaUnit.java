@@ -135,7 +135,7 @@ public class GvozdikaUnit extends UnitType {
    }
 
    public void draw(Unit unit) {
-      float z = unit.elevation > 0.5F ? Layer.flyingUnitLow : this.groundLayer;
+      float z = UnitZ.of(this, unit); // the body layer: the cell goes on it, after the turrets (see UnitZ)
 
       // hull, turrets (with their recoil) and hover rings
       TurretPatch.shadowOff();
@@ -155,7 +155,7 @@ public class GvozdikaUnit extends UnitType {
       float kick = m == null ? 0.0F : (float)Math.pow((double)m.recoil, 1.8D) * this.main.recoil;
       float tx = unit.x + Angles.trnsx(tr, 0.0F, -kick);
       float ty = unit.y + Angles.trnsy(tr, 0.0F, -kick);
-      Draw.z(z + 0.011F);
+      Draw.z(z);
       Draw.color(TeamTint.cell(unit));
       Draw.rect(this.cellRegion, tx, ty, tr);
       // the dark outline of the cell keeps its own colour

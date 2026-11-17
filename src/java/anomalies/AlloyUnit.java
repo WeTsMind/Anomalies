@@ -245,14 +245,28 @@ public class AlloyUnit extends UnitType {
    }
 
    void drawAll(Unit var1) {
+      // the projector and the cyan lines lie on the legs layer (z - 0.02), drawn before the unit so its own legs and hull cover them;
+      // the charging ball goes on the body layer right after the body (see UnitZ), so it never floats over other units
+      float z = UnitZ.of(this, var1);
+      this.drawUnder(var1, z - 0.02F);
+      Draw.z(z);
       super.draw(var1);
+      this.drawOrb(var1, z);
+   }
+
+   void drawUnder(Unit var1, float zUnder) {
       float var2 = var1.rotation;
       float var3 = var1.x + Mathf.cosDeg(var2) * -4.5F;
       float var4 = var1.y + Mathf.sinDeg(var2) * -4.5F;
       float var5 = var1.x + Mathf.cosDeg(var2) * 5.1042113F;
       float var6 = var1.y + Mathf.sinDeg(var2) * 5.1042113F;
       float var7 = 0.75F + 0.25F * Mathf.sin(Time.time * 0.5F);
-      Draw.z(74.5F);
+      // the projector first, the lines over it
+      Draw.z(zUnder);
+      Draw.reset();
+      if (this.proj != null && this.proj.found()) {
+         Draw.rect(this.proj, var1.x + Mathf.cosDeg(var2) * -4.5F, var1.y + Mathf.sinDeg(var2) * -4.5F, var2 - 90.0F);
+      }
       Draw.blend(Blending.additive);
 
       for(int var8 = 0; var8 < 2; ++var8) {
@@ -273,12 +287,11 @@ public class AlloyUnit extends UnitType {
       }
 
       Draw.blend();
-      Draw.z(74.0F);
       Draw.reset();
-      if (this.proj != null && this.proj.found()) {
-         Draw.rect(this.proj, var1.x + Mathf.cosDeg(var2) * -4.5F, var1.y + Mathf.sinDeg(var2) * -4.5F, var2 - 90.0F);
-      }
+   }
 
+   void drawOrb(Unit var1, float z) {
+      float var2 = var1.rotation;
       float var13 = 1.0F;
       if (var1.mounts.length > 0) {
          var13 = Mathf.clamp(1.0F - var1.mounts[0].reload / 180.0F);
@@ -289,7 +302,7 @@ public class AlloyUnit extends UnitType {
          float var15 = var1.y + Mathf.sinDeg(var2) * 3.0F;
          float var16 = 0.35F * AlphaSettings.scale() * var13;
          float var17 = 0.9F + 0.1F * Mathf.sin(Time.time * 0.3F);
-         Draw.z(77.0F);
+         Draw.z(z);
          Draw.blend(Blending.additive);
          Draw.color(body, 0.55F * var13);
          Fill.circle(var14, var15, 4.0F * var17 * var16);
