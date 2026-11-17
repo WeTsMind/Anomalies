@@ -12,14 +12,14 @@ import mindustry.gen.Bullet;
 import mindustry.graphics.Drawf;
 
 /**
- * Lavanda shot: a glowing violet bullet (60 damage). When it hits something it breaks into 3 violet glowing shards
+ * Lavanda shot: a glowing violet bullet (25 damage). When it hits something it breaks into 3 violet glowing shards
  * (20 damage each) that fly to the left, straight ahead and to the right of the bullet's direction.
  */
 public class LavandaShot extends BasicBulletType {
    static final Color violet = Color.valueOf("a566ff"), pale = Color.valueOf("e3d0ff");
 
    public LavandaShot() {
-      super(5.0F, 60.0F);
+      super(5.0F, 25.0F);
       this.lifetime = 28.0F;
       this.width = 7.0F;
       this.height = 15.0F;

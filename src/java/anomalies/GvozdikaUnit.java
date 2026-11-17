@@ -22,6 +22,7 @@ import mindustry.type.Weapon;
  * (4 px = 1 world unit), the unit centre is the canvas centre:
  * - gvozdika.png the hull; gvozdika-gun.png the main turret (body + barrel), turns around the unit centre and recoils;
  *   gvozdika-cell.png the white piece at the back of the main turret: the cell (team colour), turns and recoils with the turret;
+ *   gvozdika-cell-outline.png its dark outline, drawn on top in its own colour (not tinted);
  * - gvozdika-side-l.png / gvozdika-side-r.png the 4 side turrets (16x22, the centre of the sprite is the pivot), each turns on its own;
  * - main turret: the Demolisher shell in glowing violet, 60 damage, once a second;
  * - side turrets: regular bullets in glowing violet, 10 damage, each turret reloads in 0.5 s, they fire in turn 1, 2, 3, 4
@@ -35,7 +36,7 @@ public class GvozdikaUnit extends UnitType {
    static final float SIDE_RELOAD = 30.0F;
    /** the main turret: reload, ticks (1 s) */
    static final float MAIN_RELOAD = 60.0F;
-   TextureRegion cellRegion;
+   TextureRegion cellRegion, cellOutlineRegion;
    Weapon main;
 
    public GvozdikaUnit(String name) {
@@ -45,7 +46,7 @@ public class GvozdikaUnit extends UnitType {
       this.flying = false;
       this.hovering = true;
       this.canDrown = false;
-      this.health = 1300.0F;
+      this.health = 550.0F;
       this.armor = 4.0F;
       this.speed = 0.85F;
       this.hitSize = 17.0F;
@@ -114,6 +115,7 @@ public class GvozdikaUnit extends UnitType {
    public void load() {
       super.load();
       this.cellRegion = Core.atlas.find(this.name + "-cell");
+      this.cellOutlineRegion = Core.atlas.find(this.name + "-cell-outline");
       if (Core.atlas.has(this.name + "-icon")) {
          TextureRegion icon = Core.atlas.find(this.name + "-icon");
          this.fullIcon = icon;
@@ -156,6 +158,9 @@ public class GvozdikaUnit extends UnitType {
       Draw.z(z + 0.011F);
       Draw.color(TeamTint.cell(unit));
       Draw.rect(this.cellRegion, tx, ty, tr);
+      // the dark outline of the cell keeps its own colour
+      Draw.color();
+      Draw.rect(this.cellOutlineRegion, tx, ty, tr);
       Draw.reset();
    }
 

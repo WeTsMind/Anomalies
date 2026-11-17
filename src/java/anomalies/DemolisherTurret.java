@@ -43,7 +43,9 @@ public class DemolisherTurret extends ItemTurret {
       this.range = 190.0F;
       this.rotateSpeed = 6.0F;
       this.recoil = 0.0F; // the head stays in place, only the barrel kicks back
-      this.shootY = 23.0F - LOWER; // the tip of the barrel
+      // the shell starts at the end (bottom) of the slit in the barrel: row 86 of the 256x256 barrel sprite,
+      // (128 - 86) / 4 = 10.5 units in front of the texture centre, which sits LOWER units behind the pivot
+      this.shootY = 10.5F - LOWER;
       this.inaccuracy = 0.0F;
       this.coolant = this.consume(new ConsumeLiquid(Liquids.cryofluid, 0.2F));
       this.targetAir = true;

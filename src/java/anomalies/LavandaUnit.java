@@ -34,7 +34,7 @@ public class LavandaUnit extends UnitType {
       this.flying = false;
       this.hovering = true; // levitates over the ground (and over deep water) without drowning
       this.canDrown = false;
-      this.health = 700.0F;
+      this.health = 200.0F;
       this.armor = 2.0F;
       this.speed = 1.0F;
       this.hitSize = 14.0F;
