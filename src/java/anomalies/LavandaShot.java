@@ -20,6 +20,7 @@ public class LavandaShot extends BasicBulletType {
 
    public LavandaShot() {
       super(5.0F, 25.0F);
+      this.keepVelocity = false; // flies exactly along the barrel, the unit's own speed is not added
       this.lifetime = 28.0F;
       this.width = 7.0F;
       this.height = 15.0F;

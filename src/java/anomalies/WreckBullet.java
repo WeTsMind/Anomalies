@@ -55,6 +55,7 @@ public class WreckBullet extends BulletType {
       this.collidesAir = true;
       this.collidesGround = true;
       this.pierce = false;
+      this.keepVelocity = false; // flies exactly along the barrel, the shooter's own speed is not added
       this.trailLength = 9;
       this.trailWidth = 1.6F;
       this.trailColor = color;

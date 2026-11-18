@@ -32,6 +32,7 @@ public class GvozdikaShot {
    public static class Side extends BasicBulletType {
       public Side() {
          super(3.5F, 10.0F);
+         this.keepVelocity = false; // flies exactly along the barrel, the unit's own speed is not added
          this.lifetime = 44.0F; // range ~154
          this.width = 7.0F;
          this.height = 9.0F;

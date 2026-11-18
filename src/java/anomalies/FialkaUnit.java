@@ -51,6 +51,10 @@ public class FialkaUnit extends UnitType {
    static final float[] CURL_BEND = {45.0F, 45.0F, 45.0F, 45.0F};
    /** how far the tail gun may bend towards the target on top of the curl, degrees */
    static final float GUN_BEND = 35.0F;
+   /** how far the whole curled tail may swing towards a target that is not in front, degrees */
+   static final float SWING = 80.0F;
+   /** the tail gun fires only when its barrel looks at the aim point within this angle, degrees */
+   static final float TAIL_CONE = 12.0F;
    /** main gun pivot (behind the unit centre) */
    static final float GUN_Y = -5.0F;
 
@@ -126,7 +130,7 @@ public class FialkaUnit extends UnitType {
       t.recoil = 1.5F;
       t.recoilTime = 16.0F;
       t.shootY = 6.0F;
-      t.shootCone = 20.0F;
+      t.shootCone = 180.0F; // the real aim check is in TailWeapon.update, from the tail gun itself
       t.ejectEffect = Fx.none;
       t.shootSound = ModSounds.lavandaShot();
       t.bullet = FialkaShot.tail();
@@ -195,10 +199,18 @@ public class FialkaUnit extends UnitType {
       t.lastRot = unit.rotation;
       t.turn = Mathf.lerpDelta(t.turn, Mathf.clamp(turned / this.rotateSpeed, -1.0F, 1.0F), 0.15F);
 
+      // a unit under a player's command (CommandAI) never turns to its target by itself: when it stands still and the tail
+      // gun has a target, the body turns to it, so the curled tail gun can look at it
+      if (shooting && tm != null && !unit.moving() && !unit.isPlayer()) {
+         unit.lookAt(aimX, aimY);
+      }
+      // the curled tail as a whole swings towards the target (up to SWING degrees from the body direction)
+      float swing = shooting ? Mathf.clamp(signedDiff(Angles.angle(unit.x, unit.y, aimX, aimY), unit.rotation), -SWING, SWING) : 0.0F;
+
       // every piece follows the previous one bent by the curl (to the left: the angle goes down from "back" through "left" to "forward")
       float prev = unit.rotation + 180.0F;
       for (int i = 0; i < 4; i++) {
-         float target = prev - t.curl * CURL_BEND[i];
+         float target = prev - t.curl * (CURL_BEND[i] - swing / 4.0F);
          if (i == 3 && shooting) {
             // the tail gun bends a bit more towards the target
             float want = Angles.angle(t.jx[3], t.jy[3], aimX, aimY);
@@ -316,8 +328,11 @@ public class FialkaUnit extends UnitType {
          this.x = Tmp.v1.x;
          this.y = Tmp.v1.y;
          this.baseRotation = t.ang[3] - unit.rotation;
-         if (t.curl < 0.97F) {
-            mount.reload = Math.max(mount.reload, Time.delta * unit.reloadMultiplier + 0.01F); // hold the shot while the tail curls
+         // hold the shot while the tail curls and until the barrel itself looks at the aim point (the vanilla cone check is
+         // measured from the unit centre, so it is switched off with shootCone = 180 and done here from the tail gun)
+         boolean aimed = Angles.within(t.ang[3], Angles.angle(t.jx[3], t.jy[3], mount.aimX, mount.aimY), TAIL_CONE);
+         if (t.curl < 0.97F || !aimed) {
+            mount.reload = Math.max(mount.reload, Time.delta * unit.reloadMultiplier + 0.01F);
          }
          float before = mount.reload;
          try {
