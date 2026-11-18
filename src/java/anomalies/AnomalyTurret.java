@@ -127,7 +127,7 @@ public class AnomalyTurret extends PowerTurret {
          if (powered > 0.01F) {
             Draw.alpha(var6);
             float var7 = 28.0F * (1.0F + 0.06F * this.heat);
-            Draw.rect(AnomalyTurret.this.glowRegion, var3, var4, var7, var7, Time.time * 0.5F);
+            Draw.rect(AnomalyTurret.this.glowRegion, var3, var4, var7, var7, Mathf.mod(Time.time * 0.5F, 360.0F));
          }
          float var8 = TurretPatch.begin(this, var1);
          if (var8 > 0.0F) {

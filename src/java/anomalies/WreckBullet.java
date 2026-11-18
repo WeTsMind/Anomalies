@@ -81,8 +81,10 @@ public class WreckBullet extends BulletType {
 
    public void draw(Bullet b) {
       super.draw(b);
-      float spin = Time.time * 6.0F + b.id * 40.0F;
-      float pulse = 0.85F + 0.15F * Mathf.sin(Time.time * 0.5F + b.id);
+      // the angles are kept small: Arc's table sin/cos overflow on huge arguments (a long game gives bullet ids in the millions,
+      // id * 40 degrees then turns the sprite into a zero size or broken quad, so the shell vanished or flickered)
+      float spin = Mathf.mod(Time.time * 6.0F + (b.id % 9) * 40.0F, 360.0F);
+      float pulse = 0.85F + 0.15F * Mathf.sin(Mathf.mod(Time.time * 0.5F, Mathf.PI2 * 100.0F) + (b.id % 64));
       if (this.region != null && this.region.found()) {
          float size = this.region.width * Draw.scl * this.spriteScale;
          float rot = this.spin ? spin : b.rotation() - 90.0F;
@@ -90,7 +92,7 @@ public class WreckBullet extends BulletType {
          Draw.rect(this.region, b.x, b.y, size, size, rot);
          Draw.blend(Blending.additive);
          Draw.color(this.color, 0.55F * pulse);
-         Draw.rect(this.region, b.x, b.y, size * 1.35F, size * 1.35F, this.spin ? -spin * 0.7F : rot);
+         Draw.rect(this.region, b.x, b.y, size * 1.35F, size * 1.35F, this.spin ? Mathf.mod(-spin * 0.7F, 360.0F) : rot);
          Draw.color(this.color, 0.22F * pulse);
          Fill.circle(b.x, b.y, 5.5F);
          Draw.blend();

@@ -52,7 +52,7 @@ public class LavandaShot extends BasicBulletType {
 
    public void draw(Bullet b) {
       super.draw(b);
-      float pulse = 0.85F + 0.15F * Mathf.sin(Time.time * 0.5F + b.id);
+      float pulse = 0.85F + 0.15F * Mathf.sin(Mathf.mod(Time.time * 0.5F, Mathf.PI2 * 100.0F) + (b.id % 64));
       Draw.blend(Blending.additive);
       Draw.color(violet, 0.5F * pulse);
       Fill.circle(b.x, b.y, 5.5F);
@@ -86,7 +86,7 @@ public class LavandaShot extends BasicBulletType {
 
       public void draw(Bullet b) {
          super.draw(b);
-         float pulse = 0.85F + 0.15F * Mathf.sin(Time.time * 0.6F + b.id);
+         float pulse = 0.85F + 0.15F * Mathf.sin(Mathf.mod(Time.time * 0.6F, Mathf.PI2 * 100.0F) + (b.id % 64));
          Draw.blend(Blending.additive);
          Draw.color(violet, 0.5F * pulse);
          Fill.circle(b.x, b.y, 3.4F);
