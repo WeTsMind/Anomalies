@@ -20,6 +20,7 @@ public class AnomalyModFixed extends AnomalyModGolden {
    public static UnitType test01;
    public static Block demolisher;
    public static Block cutter;
+   public static Block flinger;
    public static Block empTower;
    public static Block goldWall;
    public static OphanCore ophanCore;
@@ -89,6 +90,12 @@ public class AnomalyModFixed extends AnomalyModGolden {
          cutter = new CutterTurret("cutter");
       } catch (Throwable var12) {
          Log.err(var12);
+      }
+
+      try {
+         flinger = new FlingerTurret("flinger");
+      } catch (Throwable e) {
+         Log.err(e);
       }
 
       try {
