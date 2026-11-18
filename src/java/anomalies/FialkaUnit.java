@@ -90,9 +90,9 @@ public class FialkaUnit extends UnitType {
       this.canDrown = false;
       this.health = 1300.0F;
       this.armor = 5.0F;
-      this.speed = 20.0F * 8.0F / 60.0F; // 20 tiles per second
+      this.speed = 10.0F * 8.0F / 60.0F; // 10 tiles per second
       this.hitSize = 20.0F;
-      this.rotateSpeed = 2.5F; // smooth, not jerky turns
+      this.rotateSpeed = 7.0F; // turns quickly, so it does not swing wide at speed
       this.faceTarget = true; // the body turns to the target, so the curled tail gun can look at it
       this.targetAir = true;
       this.targetGround = true;
@@ -181,7 +181,11 @@ public class FialkaUnit extends UnitType {
    public void update(Unit unit) {
       super.update(unit);
       Tail t = state(unit);
-      boolean shooting = unit.isShooting();
+      // the tail gun's own aim: the AI aims every gun on its own (unit.aimX/aimY are only set for players), so the tail has to
+      // follow the aim of its own mount, otherwise it looks past the target and never fires
+      WeaponMount tm = mount(unit, this.tailGun);
+      boolean shooting = tm != null ? tm.shoot : unit.isShooting();
+      float aimX = tm != null ? tm.aimX : unit.aimX(), aimY = tm != null ? tm.aimY : unit.aimY();
       t.curl = Mathf.approachDelta(t.curl, shooting ? 1.0F : 0.0F, 1.0F / 24.0F);
       t.kick = Mathf.approachDelta(t.kick, 0.0F, 1.0F / 14.0F);
       float v = unit.deltaLen() / Math.max(Time.delta, 0.001F);
@@ -197,7 +201,7 @@ public class FialkaUnit extends UnitType {
          float target = prev - t.curl * CURL_BEND[i];
          if (i == 3 && shooting) {
             // the tail gun bends a bit more towards the target
-            float want = Angles.angle(t.jx[3], t.jy[3], unit.aimX(), unit.aimY());
+            float want = Angles.angle(t.jx[3], t.jy[3], aimX, aimY);
             target += Mathf.clamp(signedDiff(want, target), -GUN_BEND, GUN_BEND) * t.curl;
          }
          t.ang[i] = Mathf.slerpDelta(t.ang[i], target, FOLLOW[i]);

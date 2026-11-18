@@ -165,8 +165,8 @@ public class GvozdikaUnit extends UnitType {
    }
 
    /**
-    * A side turret that keeps the firing order: it may only fire when it is its turn (the side turret with the fewest shots,
-    * the lowest order wins a tie) and a quarter of the reload has passed since the previous side turret fired.
+    * A side turret that keeps the firing order: it may only fire when it is its turn (the next turret with a target after the
+    * one that fired last) and a quarter of the reload has passed since that shot.
     */
    public static class SideWeapon extends Weapon {
       final int order;
@@ -186,12 +186,23 @@ public class GvozdikaUnit extends UnitType {
                if (o >= 0 && o < side.length) side[o] = (SideMount)wm;
             }
          }
-         int turn = 0;
-         for (int i = 1; i < side.length; i++) {
-            if (side[i] != null && (side[turn] == null || side[i].shots < side[turn].shots)) turn = i;
+         // the turret that fired last
+         int last = -1;
+         for (int i = 0; i < side.length; i++) {
+            if (side[i] != null && side[i].lastShot > -1.0E8F && (last < 0 || side[i].lastShot > side[last].lastShot)) last = i;
          }
-         SideMount prev = side[(turn + side.length - 1) % side.length];
-         boolean allowed = turn == this.order && (prev == null || prev == mount || prev.reload <= this.reload * (1.0F - 1.0F / side.length) + 0.001F);
+         // its turn: the next turret after it (1, 2, 3, 4, 1...) that has a target; a turret without a target is skipped,
+         // so the others never wait for it
+         int turn = -1;
+         for (int k = 1; k <= side.length; k++) {
+            int i = (last + k + side.length) % side.length;
+            if (side[i] != null && side[i].shoot) {
+               turn = i;
+               break;
+            }
+         }
+         float gap = this.reload / side.length / Math.max(unit.reloadMultiplier, 0.01F);
+         boolean allowed = turn == this.order && (last < 0 || Time.time - side[last].lastShot >= gap);
          if (!allowed) {
             // hold the shot (it still turns towards the target)
             mount.reload = Math.max(mount.reload, Time.delta * unit.reloadMultiplier + 0.01F);
@@ -199,14 +210,14 @@ public class GvozdikaUnit extends UnitType {
          float before = mount.reload;
          super.update(unit, mount);
          if (mount.reload > before + 0.001F && mount instanceof SideMount) {
-            ((SideMount)mount).shots++;
+            ((SideMount)mount).lastShot = Time.time;
          }
       }
    }
 
    public static class SideMount extends WeaponMount {
-      /** how many times this turret has fired */
-      public int shots;
+      /** when this turret fired last (Time.time), never = -1e9 */
+      public float lastShot = -1.0E9F;
 
       public SideMount(Weapon weapon) {
          super(weapon);
