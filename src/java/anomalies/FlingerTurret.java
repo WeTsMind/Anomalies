@@ -43,6 +43,7 @@ public class FlingerTurret extends ItemTurret {
       super(name);
       this.size = 1; // the base is 32x32 (one block), the head overhangs it a little, like the Duo
       this.health = 160;
+      this.outlineIcon = false; // no dark outline generated around the head; the sprite is drawn as it is
       this.requirements(Category.turret, BuildVisibility.shown, ItemStack.with(new Object[]{Items.copper, 30}));
       this.reload = 51.0F; // 0.85 s
       this.range = 56.0F; // 7 blocks

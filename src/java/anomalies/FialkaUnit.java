@@ -55,8 +55,10 @@ public class FialkaUnit extends UnitType {
    static final float SWING = 80.0F;
    /** the tail gun fires only when its barrel looks at the aim point within this angle, degrees */
    static final float TAIL_CONE = 12.0F;
-   /** main gun pivot (behind the unit centre) */
-   static final float GUN_Y = -5.0F;
+   /** main gun pivot (behind the unit centre): the middle of the whole gun (barrel + base), the sprites are centred on it */
+   static final float GUN_Y = -2.5F;
+   /** the main gun turns at most this far to each side of the body direction, degrees */
+   static final float GUN_LIMIT = 45.0F;
 
    static final WeakHashMap<Unit, Tail> TAILS = new WeakHashMap<>();
    static final Color HOVER = Color.valueOf("bf92f9");
@@ -108,9 +110,10 @@ public class FialkaUnit extends UnitType {
       Weapon gun = new Weapon("anomalies-fialka-gun");
       gun.x = 0.0F;
       gun.y = GUN_Y;
-      gun.shootY = 7.25F;
+      gun.shootY = 4.75F; // the tip of the barrel, from the middle of the gun
       gun.mirror = false;
       gun.rotate = true;
+      gun.rotationLimit = GUN_LIMIT * 2.0F; // -45 .. +45 degrees from straight ahead
       gun.rotateSpeed = 5.0F;
       gun.reload = 51.0F; // 0.85 s
       gun.recoil = 1.25F;

@@ -21,6 +21,7 @@ public class AnomalyModFixed extends AnomalyModGolden {
    public static Block demolisher;
    public static Block cutter;
    public static Block flinger;
+   public static Block destroyer;
    public static Block empTower;
    public static Block goldWall;
    public static OphanCore ophanCore;
@@ -94,6 +95,12 @@ public class AnomalyModFixed extends AnomalyModGolden {
 
       try {
          flinger = new FlingerTurret("flinger");
+      } catch (Throwable e) {
+         Log.err(e);
+      }
+
+      try {
+         destroyer = new DestroyerTurret("destroyer");
       } catch (Throwable e) {
          Log.err(e);
       }
