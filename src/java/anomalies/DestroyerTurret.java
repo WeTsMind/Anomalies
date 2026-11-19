@@ -20,7 +20,7 @@ import mindustry.world.meta.BuildVisibility;
 /**
  * Destroyer: a 2x2 item turret fed with copper, graphite or silicon; fires from both slits of the barrel at once every 0.55 s,
  * range 10 blocks. Sprites are cut from destroyer.ase, all on a 128x128 canvas (4 px = 1 world unit) whose centre is the
- * rotation centre; the base is the vanilla 2x2 turret base:
+ * rotation centre; the base is base002.png (the same as the Demolisher's):
  * - destroyer.png the head (body); destroyer-barrel.png the barrel with its two slits, under the head;
  * - destroyer-gear.png the two small front gears beside the barrel (under it): they spin at every shot;
  * - destroyer-gear-big.png the two big rear gears under the head: they turn while the turret turns.
@@ -112,6 +112,7 @@ public class DestroyerTurret extends ItemTurret {
 
    public void load() {
       super.load();
+      TurretPatch.base002(this);
       this.barrelRegion = Core.atlas.find(this.name + "-barrel");
       this.gearRegion = Core.atlas.find(this.name + "-gear");
       this.bigGearRegion = Core.atlas.find(this.name + "-gear-big");

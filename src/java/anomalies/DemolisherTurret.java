@@ -19,7 +19,7 @@ import mindustry.world.consumers.ConsumeLiquid;
 import mindustry.world.meta.BuildVisibility;
 
 /**
- * Demolisher: a 2x2 item turret, one shot every 1.5 seconds. Sprites: demolisher-base.png (the base), demolisher-barrel.png (the barrel,
+ * Demolisher: a 2x2 item turret, one shot every 1.5 seconds. Sprites: base002.png (the base, shared with the Destroyer), demolisher-barrel.png (the barrel,
  * drawn UNDER the head and kicking back when it fires), demolisher.png (the head), demolisher-bullet.png (the glowing shell),
  * both big ones share a 256x256 canvas (4 px = 1 world unit) whose centre is the turret's rotation centre.
  * Ammo: tratat 75 damage + pushes enemy units back half a block; titanium 50 damage + slows the hit unit by 25%; thorium 75 damage.
@@ -70,6 +70,7 @@ public class DemolisherTurret extends ItemTurret {
 
    public void load() {
       super.load();
+      TurretPatch.base002(this);
       this.barrelRegion = Core.atlas.find(this.name + "-barrel");
       if (Core.atlas.has(this.name + "-icon")) {
          TextureRegion icon = Core.atlas.find(this.name + "-icon");

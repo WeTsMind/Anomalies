@@ -48,6 +48,13 @@ public class TurretPatch {
 
    }
 
+   /** the shared 2x2 turret base base002.png (Demolisher, Destroyer); call after super.load() */
+   public static void base002(Turret turret) {
+      if (turret.drawer instanceof mindustry.world.draw.DrawTurret && arc.Core.atlas.has("anomalies-base002")) {
+         ((mindustry.world.draw.DrawTurret)turret.drawer).base = arc.Core.atlas.find("anomalies-base002");
+      }
+   }
+
    private static float clamp01(float var0) {
       return var0 < 0.0F ? 0.0F : (var0 > 1.0F ? 1.0F : var0);
    }

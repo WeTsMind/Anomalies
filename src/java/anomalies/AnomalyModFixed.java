@@ -166,6 +166,7 @@ public class AnomalyModFixed extends AnomalyModGolden {
       super.init();
       AnomalyShaders.load();
       DataSystem.init();
+      IconRender.init();
       fix("anomalies-alloy");
       fix("anomalies-golden-ratio");
       fix("anomalies-arux");

@@ -3,6 +3,11 @@ package anomalies;
 import arc.Core;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.Fill;
+import arc.input.KeyCode;
+import arc.struct.IntSet;
+import arc.struct.Seq;
+import mindustry.core.World;
 import arc.graphics.g2d.Lines;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
@@ -50,7 +55,7 @@ import java.util.WeakHashMap;
  */
 public class ExcavatorUnit extends UnitType {
    /** saw centres (local units: x to the side, y forward) */
-   static final float[][] SAW = {{-3.5F, 5.875F}, {0.0F, 5.625F}, {3.5F, 5.875F}};
+   static final float[][] SAW = {{-3.5F, 5.625F}, {0.0F, 5.375F}, {3.5F, 5.625F}};
    /** how far the teeth reach in front of a saw centre, world units */
    static final float SAW_REACH = 2.6F;
    /** saw damage and its interval: 1 damage every 0.1 s */
@@ -87,7 +92,113 @@ public class ExcavatorUnit extends UnitType {
    static final IntFloatMap CUT = new IntFloatMap();
 
    static {
-      Events.on(EventType.WorldLoadEvent.class, e -> CUT.clear());
+      Events.on(EventType.WorldLoadEvent.class, e -> {
+         CUT.clear();
+         dragging = false;
+      });
+      Events.run(EventType.Trigger.update, ExcavatorUnit::updateZoneInput);
+      Events.run(EventType.Trigger.draw, ExcavatorUnit::drawZones);
+   }
+
+   /** a rectangle of tiles to clear (inclusive tile coordinates), shared by all excavators sent there together */
+   public static class Zone {
+      public final int x1, y1, x2, y2;
+
+      public Zone(int x1, int y1, int x2, int y2) {
+         this.x1 = x1;
+         this.y1 = y1;
+         this.x2 = x2;
+         this.y2 = y2;
+      }
+
+      public boolean contains(Tile t) {
+         return t != null && t.x >= x1 && t.x <= x2 && t.y >= y1 && t.y <= y2;
+      }
+
+      public boolean hasWalls() {
+         for (int x = x1; x <= x2; x++) for (int y = y1; y <= y2; y++) if (terrainWall(Vars.world.tile(x, y))) return true;
+         return false;
+      }
+   }
+
+   /** the biggest zone side, tiles */
+   static final int ZONE_MAX = 80;
+   static final Color ZONE = Color.valueOf("ff9a3c");
+
+   /** right-button drag in command mode with excavators selected: the zone being drawn (world coordinates of the start) */
+   static boolean dragging;
+   static float dragX, dragY;
+
+   static boolean excavatorsSelected() {
+      for (Unit u : Vars.control.input.selectedUnits) if (u.type instanceof ExcavatorUnit) return true;
+      return false;
+   }
+
+   static int[] dragTiles() {
+      float mx = Core.input.mouseWorldX(), my = Core.input.mouseWorldY();
+      int ax = World.toTile(dragX), ay = World.toTile(dragY), bx = World.toTile(mx), by = World.toTile(my);
+      int x1 = Mathf.clamp(Math.min(ax, bx), 0, Vars.world.width() - 1), x2 = Mathf.clamp(Math.max(ax, bx), 0, Vars.world.width() - 1);
+      int y1 = Mathf.clamp(Math.min(ay, by), 0, Vars.world.height() - 1), y2 = Mathf.clamp(Math.max(ay, by), 0, Vars.world.height() - 1);
+      x2 = Math.min(x2, x1 + ZONE_MAX - 1);
+      y2 = Math.min(y2, y1 + ZONE_MAX - 1);
+      return new int[]{x1, y1, x2, y2};
+   }
+
+   /**
+    * Zone orders (desktop): in command mode, with excavators selected, drag with the right mouse button over the walls to
+    * clear. The press itself is the usual move order; the release (when the box is at least 2 tiles long) turns it into the
+    * zone order for every selected excavator.
+    */
+   static void updateZoneInput() {
+      if (Vars.headless || Vars.control == null || !Vars.state.isGame() || !Vars.control.input.commandMode) {
+         dragging = false;
+         return;
+      }
+      if (Core.input.keyTap(KeyCode.mouseRight) && !Core.scene.hasMouse() && excavatorsSelected()) {
+         dragging = true;
+         dragX = Core.input.mouseWorldX();
+         dragY = Core.input.mouseWorldY();
+      }
+      if (dragging && !Core.input.keyDown(KeyCode.mouseRight)) {
+         dragging = false;
+         int[] r = dragTiles();
+         if (r[2] - r[0] < 1 && r[3] - r[1] < 1) return; // a click, not a box: the usual order
+         Zone zone = new Zone(r[0], r[1], r[2], r[3]);
+         for (Unit u : Vars.control.input.selectedUnits) {
+            if (u.type instanceof ExcavatorUnit && u.controller() instanceof ExcavatorAI) ((ExcavatorAI)u.controller()).setZone(zone);
+         }
+         Fx.attackCommand.at((r[0] + r[2]) / 2.0F * Vars.tilesize, (r[1] + r[3]) / 2.0F * Vars.tilesize);
+      }
+   }
+
+   static void drawZoneRect(int x1, int y1, int x2, int y2, float fill) {
+      float x = x1 * Vars.tilesize - Vars.tilesize / 2.0F, y = y1 * Vars.tilesize - Vars.tilesize / 2.0F;
+      float w = (x2 - x1 + 1) * Vars.tilesize, h = (y2 - y1 + 1) * Vars.tilesize;
+      Draw.color(ZONE, fill);
+      Fill.crect(x, y, w, h);
+      Draw.color(ZONE, 0.9F);
+      Lines.stroke(1.0F);
+      Lines.rect(x, y, w, h);
+      Draw.reset();
+   }
+
+   /** command mode: the zones of the selected excavators and the box being dragged */
+   static void drawZones() {
+      if (Vars.headless || Vars.control == null || !Vars.state.isGame() || !Vars.control.input.commandMode) return;
+      Draw.z(Layer.overlayUI - 0.1F);
+      Zone last = null;
+      for (Unit u : Vars.control.input.selectedUnits) {
+         if (!(u.controller() instanceof ExcavatorAI)) continue;
+         Zone z = ((ExcavatorAI)u.controller()).zone;
+         if (z == null || z == last) continue;
+         last = z;
+         drawZoneRect(z.x1, z.y1, z.x2, z.y2, 0.08F);
+      }
+      if (dragging) {
+         int[] r = dragTiles();
+         if (r[2] - r[0] >= 1 || r[3] - r[1] >= 1) drawZoneRect(r[0], r[1], r[2], r[3], 0.18F);
+      }
+      Draw.reset();
    }
 
    TextureRegion sawRegion;
@@ -326,17 +437,28 @@ public class ExcavatorUnit extends UnitType {
     * is gone it is done. Any other command cancels the cutting.
     */
    public static class ExcavatorAI extends CommandAI {
-      /** the terrain wall tile it was sent to cut, null = none */
+      /** the terrain wall tile it is cutting (or going to), null = none */
       public Tile cutTile;
+      /** the free tile it stands on to cut cutTile (zone work), null = none */
+      public Tile stand;
+      /** the zone it clears, null = none */
+      public Zone zone;
+      /** the last tile it cut out in the zone: the next one is taken next to it, so every excavator digs its own lane */
+      Tile lastCut;
+      /** zone tiles it could not reach, tried again later */
+      final IntSet skip = new IntSet();
+      float skipTimer, pickTimer;
 
       @Override
       public void commandPosition(Vec2 pos, boolean stopWhenInRange) {
+         this.zone = null;
+         this.stand = null;
          Tile t = pos == null ? null : Vars.world.tileWorld(pos.x, pos.y);
          if (terrainWall(t)) {
             // the wall is the target: the unit walks to the free tile next to it and cuts it
             this.cutTile = t;
-            Tile stand = this.standTile(t);
-            super.commandPosition(stand != null ? new Vec2(stand.worldx(), stand.worldy()) : pos, false);
+            Tile st = this.standTile(t, null);
+            super.commandPosition(st != null ? new Vec2(st.worldx(), st.worldy()) : pos, false);
             if (!Vars.headless) Fx.attackCommand.at(t.worldx(), t.worldy()); // the same red mark as an attack order
             return;
          }
@@ -347,17 +469,103 @@ public class ExcavatorUnit extends UnitType {
       @Override
       public void commandTarget(Teamc moveTo, boolean stopAtTarget) {
          this.cutTile = null;
+         this.stand = null;
+         this.zone = null;
          super.commandTarget(moveTo, stopAtTarget);
       }
 
       @Override
       public void clearCommands() {
          this.cutTile = null;
+         this.stand = null;
+         this.zone = null;
          super.clearCommands();
       }
 
-      /** the free (passable) tile next to the wall that is closest to the unit */
-      Tile standTile(Tile wall) {
+      /** the zone order: clear every terrain wall inside the zone */
+      public void setZone(Zone z) {
+         this.commandQueue.clear();
+         this.targetPos = null;
+         this.attackTarget = null;
+         this.group = null;
+         this.cutTile = null;
+         this.stand = null;
+         this.lastCut = null;
+         this.skip.clear();
+         this.pickTimer = 0.0F;
+         this.zone = z;
+      }
+
+      /** the other excavators of this team that work right now */
+      Seq<Unit> mates() {
+         Seq<Unit> s = this.unit.team.data().unitCache(this.unit.type);
+         return s == null ? new Seq<>() : s;
+      }
+
+      static ExcavatorAI ai(Unit u) {
+         return u.controller() instanceof ExcavatorAI ? (ExcavatorAI)u.controller() : null;
+      }
+
+      /** takes the next wall of the zone: free, reachable from a free side, away from the other diggers, next to its own lane */
+      Tile pick() {
+         Seq<Unit> mates = this.mates();
+         Zone z = this.zone;
+         float best = Float.MAX_VALUE;
+         Tile bestTile = null, bestStand = null;
+         for (int x = z.x1; x <= z.x2; x++) {
+            for (int y = z.y1; y <= z.y2; y++) {
+               Tile t = Vars.world.tile(x, y);
+               if (!terrainWall(t) || this.skip.contains(t.pos())) continue;
+               boolean taken = false;
+               float crowd = 0.0F;
+               for (Unit m : mates) {
+                  ExcavatorAI o = ai(m);
+                  if (m == this.unit || o == null || o.cutTile == null) continue;
+                  if (o.cutTile == t) {
+                     taken = true;
+                     break;
+                  }
+                  float d = Mathf.dst(o.cutTile.x, o.cutTile.y, t.x, t.y);
+                  if (d < 4.0F) crowd += (4.0F - d) * Vars.tilesize * 6.0F; // keep away from the others: own lanes
+               }
+               if (taken) continue;
+               Tile st = this.standTile(t, mates);
+               if (st == null) continue;
+               float score = this.unit.dst(st) + crowd;
+               if (this.lastCut != null) {
+                  int dx = t.x - this.lastCut.x, dy = t.y - this.lastCut.y;
+                  if (Math.abs(dx) + Math.abs(dy) == 1) score -= Vars.tilesize * 4.0F; // keep digging the own lane
+               }
+               if (score < best) {
+                  best = score;
+                  bestTile = t;
+                  bestStand = st;
+               }
+            }
+         }
+         this.stand = bestStand;
+         return bestTile;
+      }
+
+      void updateZone() {
+         if ((this.skipTimer += Time.delta) > 60.0F * 10.0F) {
+            this.skipTimer = 0.0F;
+            this.skip.clear();
+         }
+         if (this.cutTile != null) return;
+         if ((this.pickTimer -= Time.delta) > 0.0F) return;
+         this.pickTimer = 20.0F;
+         Tile t = this.pick();
+         if (t == null) {
+            if (!this.zone.hasWalls()) this.zone = null; // all cleared: done
+            return;
+         }
+         this.cutTile = t;
+         super.commandPosition(new Vec2(this.stand.worldx(), this.stand.worldy()), false);
+      }
+
+      /** the free (passable) tile next to the wall that is closest to the unit; with mates, not one another excavator stands on */
+      Tile standTile(Tile wall, Seq<Unit> mates) {
          Tile best = null;
          float bestScore = Float.MAX_VALUE;
          for (int dx = -1; dx <= 1; dx++) {
@@ -365,6 +573,14 @@ public class ExcavatorUnit extends UnitType {
                if (dx == 0 && dy == 0) continue;
                Tile n = Vars.world.tile(wall.x + dx, wall.y + dy);
                if (n == null || n.solid() || !this.unit.canPass(n.x, n.y)) continue;
+               if (mates != null) {
+                  boolean taken = false;
+                  for (Unit m : mates) {
+                     ExcavatorAI o = ai(m);
+                     if (m != this.unit && o != null && o.stand == n) taken = true;
+                  }
+                  if (taken) continue;
+               }
                // sides first, corners only if no side is free
                float score = this.unit.dst2(n.worldx(), n.worldy()) + (dx != 0 && dy != 0 ? 1.0E7F : 0.0F);
                if (score < bestScore) {
@@ -378,12 +594,27 @@ public class ExcavatorUnit extends UnitType {
 
       @Override
       public void defaultBehavior() {
-         if (this.cutTile != null && !terrainWall(this.cutTile)) this.cutTile = null; // cut out (or changed): done
+         if (this.cutTile != null && !terrainWall(this.cutTile)) {
+            // cut out (or changed): done with this tile
+            this.lastCut = this.cutTile;
+            this.cutTile = null;
+            this.stand = null;
+            this.pickTimer = 0.0F;
+         }
+         if (this.zone != null) this.updateZone();
          // when several units are sent together, the formation would spread them away from the wall: every excavator goes
          // straight to its own place next to the wall instead
          if (this.cutTile != null) this.group = null;
          super.defaultBehavior();
          if (this.cutTile != null && this.targetPos == null) {
+            if (this.zone != null && !this.unit.within(this.cutTile.worldx(), this.cutTile.worldy(), Vars.tilesize * 2.3F + this.unit.hitSize / 2.0F)) {
+               // the path ended far from the wall (it cannot be reached): take another one, try this one later
+               this.skip.add(this.cutTile.pos());
+               this.cutTile = null;
+               this.stand = null;
+               this.pickTimer = 0.0F;
+               return;
+            }
             // arrived: turn the saws to the wall and press against it (the wall stops the unit)
             this.unit.lookAt(this.cutTile.worldx(), this.cutTile.worldy());
             if (Angles.within(this.unit.rotation, this.unit.angleTo(this.cutTile.worldx(), this.cutTile.worldy()), 20.0F)) {
