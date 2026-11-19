@@ -41,6 +41,8 @@ public class FialkaUnit extends UnitType {
    static final float LEG_TILT = 30.0F;
    /** how far all the legs swing towards the side the unit is turning to, degrees (at full turn speed) */
    static final float LEG_TURN = 30.0F;
+   /** how fast a leg turns to its angle, degrees per tick */
+   static final float LEG_SPEED = 4.0F;
    /** where the tail is attached: this far behind the unit centre */
    static final float TAIL_ROOT = 8.0F;
    /** distance from one tail joint to the next (segment 1 -> 2 -> 3 -> gun) */
@@ -81,6 +83,8 @@ public class FialkaUnit extends UnitType {
       float kick;
       /** leg tilt while moving, 0..1 */
       float tilt;
+      /** current turn of every leg relative to the body, degrees */
+      float[] leg = new float[6];
       /** how fast the unit is turning: -1 (right, full speed) .. 1 (left, full speed), smoothed */
       float turn;
       /** the unit rotation on the previous update */
@@ -98,7 +102,7 @@ public class FialkaUnit extends UnitType {
       this.armor = 5.0F;
       this.speed = 10.0F * 8.0F / 60.0F; // 10 tiles per second
       this.hitSize = 20.0F;
-      this.rotateSpeed = 7.0F; // turns quickly, so it does not swing wide at speed
+      this.rotateSpeed = 5.0F;
       this.faceTarget = true; // the body turns to the target, so the curled tail gun can look at it
       this.targetAir = true;
       this.targetGround = true;
@@ -201,6 +205,12 @@ public class FialkaUnit extends UnitType {
       float turned = Float.isNaN(t.lastRot) ? 0.0F : signedDiff(unit.rotation, t.lastRot) / Math.max(Time.delta, 0.001F);
       t.lastRot = unit.rotation;
       t.turn = Mathf.lerpDelta(t.turn, Mathf.clamp(turned / this.rotateSpeed, -1.0F, 1.0F), 0.15F);
+      // every leg turns to its angle (backwards while moving + towards the turn) at most LEG_SPEED degrees per tick
+      for (int i = 0; i < 6; i++) {
+         float side = LEG_PIVOT[i][0] < 0.0F ? 1.0F : -1.0F; // backwards: left legs counter-clockwise, right legs clockwise
+         float want = side * LEG_TILT * (v > 0.15F ? 1.0F : 0.0F) + LEG_TURN * t.turn;
+         t.leg[i] = Mathf.approachDelta(t.leg[i], want, LEG_SPEED);
+      }
 
       // a unit under a player's command (CommandAI) never turns to its target by itself: when it stands still and the tail
       // gun has a target, the body turns to it, so the curled tail gun can look at it
@@ -264,8 +274,7 @@ public class FialkaUnit extends UnitType {
 
       // hover rings under the feet, then the legs; each leg turns back while moving and all of them swing towards the turn
       for (int i = 0; i < 6; i++) {
-         float side = LEG_PIVOT[i][0] < 0.0F ? 1.0F : -1.0F; // backwards: left legs counter-clockwise, right legs clockwise
-         float la = rot + side * LEG_TILT * t.tilt + LEG_TURN * t.turn;
+         float la = rot + t.leg[i];
          Tmp.v1.set(LEG_PIVOT[i][0], LEG_PIVOT[i][1]).rotate(rot);
          float px = unit.x + Tmp.v1.x, py = unit.y + Tmp.v1.y;
          Tmp.v2.set(LEG_FOOT[i][0], LEG_FOOT[i][1]).rotate(la);
@@ -282,8 +291,7 @@ public class FialkaUnit extends UnitType {
       }
       Draw.z(z);
       for (int i = 0; i < 6; i++) {
-         float side = LEG_PIVOT[i][0] < 0.0F ? 1.0F : -1.0F;
-         float la = rot + side * LEG_TILT * t.tilt + LEG_TURN * t.turn;
+         float la = rot + t.leg[i];
          Tmp.v1.set(LEG_PIVOT[i][0], LEG_PIVOT[i][1]).rotate(rot);
          Draw.rect(this.legs[i], unit.x + Tmp.v1.x, unit.y + Tmp.v1.y, la);
       }

@@ -17,6 +17,7 @@ public class AnomalyModFixed extends AnomalyModGolden {
    public static UnitType lavanda;
    public static UnitType gvozdika;
    public static UnitType fialka;
+   public static UnitType excavator;
    public static UnitType test01;
    public static Block demolisher;
    public static Block cutter;
@@ -145,6 +146,12 @@ public class AnomalyModFixed extends AnomalyModGolden {
          fialka = new FialkaUnit("fialka");
       } catch (Throwable var19) {
          Log.err(var19);
+      }
+
+      try {
+         excavator = new ExcavatorUnit("excavator");
+      } catch (Throwable e) {
+         Log.err(e);
       }
 
       try {
