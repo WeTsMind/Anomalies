@@ -18,9 +18,11 @@ import mindustry.entities.bullet.BasicBulletType;
 import mindustry.entities.units.WeaponMount;
 import mindustry.gen.Building;
 import mindustry.gen.Teamc;
+import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
-import mindustry.gen.Mechc;
-import mindustry.gen.MechUnit;
+import mindustry.graphics.Pal;
+import mindustry.entities.part.HoverPart;
+import mindustry.gen.ElevationMoveUnit;
 import mindustry.gen.Sounds;
 import mindustry.gen.Unit;
 import mindustry.type.UnitType;
@@ -37,12 +39,11 @@ import mindustry.world.blocks.environment.StaticWall;
 import java.util.WeakHashMap;
 
 /**
- * Excavator: a ground walker on four legs (front left, front right, rear left, rear right). It cannot climb walls: it walks
- * like any ground unit and goes around them. Sprites are cut from excavator.ase (4 px = 1 world unit):
+ * Excavator: a ground hover unit (like the Elude) with 6 orange hover rings, 3 along each side. It cannot climb walls: it goes
+ * around them like any ground unit. Sprites are cut from excavator.ase (4 px = 1 world unit):
  * - excavator.png the body, excavator-cell.png the cell (the three white pieces, team colour);
  * - excavator-gun.png the gun on top: turns, small recoil, 15 damage every 0.8 s, range 7 blocks;
- * - excavator-saw.png the three saws on the front edge: they spin while working;
- * - excavator-leg-upper.png / excavator-leg-foot.png one leg (the upper part and the foot), drawn at all four corners.
+ * - excavator-saw.png the three saws on the front edge: they spin while working.
  * Saws: while working they hurt everything they touch (1 damage every 0.1 s) and throw bright orange sparks. Walls are cut down
  * by the saws in one minute whatever their health: either command the unit to attack the wall (it walks up to it and starts
  * cutting), or drive it yourself right up to the wall and hold the fire button.
@@ -59,13 +60,10 @@ public class ExcavatorUnit extends UnitType {
    /** saw spin while working, degrees per tick */
    static final float SAW_SPIN = 18.0F;
 
-   /** legs: hip (local units), leg direction relative to the body (degrees), distance of the upper part and of the foot */
-   static final float[][] HIP = {{-3.5F, 3.0F}, {3.5F, 3.0F}, {-3.5F, -4.0F}, {3.5F, -4.0F}};
-   static final float[] LEG_DIR = {45.0F, -45.0F, 135.0F, -135.0F};
-   /** the upper part starts well under the body, the foot starts well under the upper part (drawn first, so it is under it) */
-   static final float UPPER = 2.5F, FOOT = 7.5F;
-   /** walking: how far the legs swing, degrees, and the stride (world units per full step cycle) */
-   static final float SWING = 14.0F, STRIDE = 22.0F;
+   /** hover rings (the Elude effect, orange): 3 along each side of the body, mirrored; local units */
+   static final float HOVER_X = 4.5F;
+   static final float[] HOVER_Y = {3.5F, -0.5F, -4.5F};
+   static final Color HOVER = Color.valueOf("ff9a3c");
 
    static final Color SPARK = Color.valueOf("ffb347"), SPARK_HOT = Color.valueOf("fff1c2");
    static final Effect sparks = new Effect(16.0F, e -> {
@@ -80,7 +78,7 @@ public class ExcavatorUnit extends UnitType {
    static final WeakHashMap<Unit, State> STATES = new WeakHashMap<>();
 
    static class State {
-      float sawRot, sawSpin, sawTimer, sparkTimer, walk, move;
+      float sawRot, sawSpin, sawTimer, sparkTimer;
       /** the terrain tile being cut right now (Tile.pos), -1 = none */
       int cutPos = -1;
    }
@@ -92,28 +90,40 @@ public class ExcavatorUnit extends UnitType {
       Events.on(EventType.WorldLoadEvent.class, e -> CUT.clear());
    }
 
-   TextureRegion sawRegion, legUpper, legFoot;
+   TextureRegion sawRegion;
    /** vanilla 1x1 block cracks, 8 stages */
    static final int CRACKS = 8;
    final TextureRegion[] cracks = new TextureRegion[CRACKS];
 
    public ExcavatorUnit(String name) {
       super(name);
-      this.constructor = MechUnit::create; // a ground walker: blocked by walls like any ground unit
+      this.constructor = ElevationMoveUnit::create; // levitates like the Elude; still blocked by walls like any ground unit
       this.controller = u -> !this.playerControllable || (u.team.isAI() && !u.team.rules().rtsAi) ? this.aiController.get() : new ExcavatorAI();
       this.alwaysUnlocked = true;
       this.flying = false;
-      this.hovering = false;
+      this.hovering = true;
+      this.canDrown = false;
       this.health = 600.0F;
       this.armor = 4.0F;
       this.speed = 0.55F;
       this.hitSize = 12.0F;
       this.rotateSpeed = 4.0F;
-      this.mechSideSway = 0.0F;
-      this.mechFrontSway = 0.0F;
-      this.mechStepParticles = false;
-      this.stepShake = 0.0F;
+      this.engineSize = 0.0F;
       this.outlines = false;
+
+      // levitation: 6 orange hover rings, 3 along each side, they glow out from under the body
+      for (float hy : HOVER_Y) {
+         this.parts.add(new HoverPart() {{
+            x = HOVER_X;
+            y = hy;
+            mirror = true;
+            radius = 6.0F;
+            phase = 90.0F;
+            stroke = 2.0F;
+            layerOffset = -0.001F;
+            color = HOVER;
+         }});
+      }
       this.drawCell = true;
       this.targetAir = true;
       this.targetGround = true;
@@ -150,8 +160,6 @@ public class ExcavatorUnit extends UnitType {
    public void load() {
       super.load();
       this.sawRegion = Core.atlas.find(this.name + "-saw");
-      this.legUpper = Core.atlas.find(this.name + "-leg-upper");
-      this.legFoot = Core.atlas.find(this.name + "-leg-foot");
       for (int i = 0; i < CRACKS; i++) this.cracks[i] = Core.atlas.find("cracks-1-" + i);
       if (Core.atlas.has(this.name + "-icon")) {
          TextureRegion icon = Core.atlas.find(this.name + "-icon");
@@ -185,8 +193,6 @@ public class ExcavatorUnit extends UnitType {
    public void update(Unit unit) {
       super.update(unit);
       State s = state(unit);
-      s.move = Mathf.approachDelta(s.move, unit.moving() ? 1.0F : 0.0F, 0.08F);
-      s.walk += unit.deltaLen();
 
       // the terrain wall in front of the saws (if any); the commanded one is preferred when the saws touch it
       Tile cutTile = unit.controller() instanceof ExcavatorAI ? ((ExcavatorAI)unit.controller()).cutTile : null;
@@ -253,11 +259,6 @@ public class ExcavatorUnit extends UnitType {
       }
    }
 
-   /** the vanilla mech legs are not used: the four legs are drawn in draw() */
-   @Override
-   public void drawMech(Mechc mech) {
-   }
-
    @Override
    public void drawShadow(Unit unit) {
    }
@@ -279,19 +280,6 @@ public class ExcavatorUnit extends UnitType {
       float rot = unit.rotation - 90.0F;
       Draw.z(z);
 
-      // legs: diagonal pairs swing together while walking (front left + rear right, front right + rear left)
-      float phase = s.walk / STRIDE * 360.0F;
-      for (int i = 0; i < 4; i++) {
-         float pair = (i == 0 || i == 3) ? 0.0F : 180.0F;
-         float swing = Mathf.sinDeg(phase + pair) * SWING * s.move;
-         float stretch = Mathf.cosDeg(phase + pair) * 0.8F * s.move;
-         float a = unit.rotation + LEG_DIR[i] + swing;
-         Tmp.v1.set(HIP[i][0], HIP[i][1]).rotate(rot).add(unit.x, unit.y);
-         float hx = Tmp.v1.x, hy = Tmp.v1.y;
-         Draw.rect(this.legFoot, hx + Mathf.cosDeg(a) * (FOOT + stretch), hy + Mathf.sinDeg(a) * (FOOT + stretch), a + 90.0F);
-         Draw.rect(this.legUpper, hx + Mathf.cosDeg(a) * UPPER, hy + Mathf.sinDeg(a) * UPPER, a + 90.0F);
-      }
-
       // saws (under the body): the middle one turns the other way, like meshing gears
       for (int i = 0; i < SAW.length; i++) {
          Tmp.v1.set(SAW[i][0], SAW[i][1]).rotate(rot);
@@ -310,6 +298,16 @@ public class ExcavatorUnit extends UnitType {
             Draw.color();
             Draw.z(z);
          }
+      }
+
+      // command mode: the wall this unit was sent to cut is marked like an attack target (the red target sign)
+      if (unit.isAdded() && unit.controller() instanceof ExcavatorAI && ((ExcavatorAI)unit.controller()).cutTile != null
+         && Vars.control != null && Vars.control.input.commandMode && Vars.control.input.selectedUnits.contains(unit)) {
+         Tile t = ((ExcavatorAI)unit.controller()).cutTile;
+         Draw.z(Layer.overlayUI);
+         Drawf.target(t.worldx(), t.worldy(), 6.0F, Pal.remove);
+         Draw.reset();
+         Draw.z(z);
       }
 
       // body, cell and gun
@@ -335,9 +333,11 @@ public class ExcavatorUnit extends UnitType {
       public void commandPosition(Vec2 pos, boolean stopWhenInRange) {
          Tile t = pos == null ? null : Vars.world.tileWorld(pos.x, pos.y);
          if (terrainWall(t)) {
+            // the wall is the target: the unit walks to the free tile next to it and cuts it
             this.cutTile = t;
             Tile stand = this.standTile(t);
             super.commandPosition(stand != null ? new Vec2(stand.worldx(), stand.worldy()) : pos, false);
+            if (!Vars.headless) Fx.attackCommand.at(t.worldx(), t.worldy()); // the same red mark as an attack order
             return;
          }
          this.cutTile = null;
@@ -379,6 +379,9 @@ public class ExcavatorUnit extends UnitType {
       @Override
       public void defaultBehavior() {
          if (this.cutTile != null && !terrainWall(this.cutTile)) this.cutTile = null; // cut out (or changed): done
+         // when several units are sent together, the formation would spread them away from the wall: every excavator goes
+         // straight to its own place next to the wall instead
+         if (this.cutTile != null) this.group = null;
          super.defaultBehavior();
          if (this.cutTile != null && this.targetPos == null) {
             // arrived: turn the saws to the wall and press against it (the wall stops the unit)
