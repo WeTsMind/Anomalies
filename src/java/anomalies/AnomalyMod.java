@@ -43,6 +43,8 @@ public class AnomalyMod extends Mod {
    public static Block tratatOre;
    public static Item gold;
    public static Block goldOre;
+   public static Item ruby;
+   public static Block rubyOre;
    public static Liquid liquidGold;
    public static Item goldNugget;
    public static Item stone;
@@ -107,6 +109,15 @@ public class AnomalyMod extends Mod {
       ((OreBlock)goldOre).oreDefault = true;
       ((OreBlock)goldOre).oreThreshold = 0.86F;
       ((OreBlock)goldOre).oreScale = 24.0F;
+      // ruby: hardness of titanium (3), so a pneumatic drill or better mines it; ore sprites ruby-ore1/2, item sprite ruby.png
+      ruby = new Item("ruby", Color.valueOf("e0102a")) {
+         {
+            this.hardness = 3;
+         }
+      };
+      rubyOre = new OreBlock("ruby-ore", ruby);
+      ((Floor)rubyOre).variants = 2;
+      // not in the editor's noise generation: ruby deposits are hexagons, laid by RubyOre when a new map starts
       // liquid gold: for now just a liquid (colour taken from its sprite)
       liquidGold = new Liquid("liquid-gold", Color.valueOf("ffd27f")) {
          {

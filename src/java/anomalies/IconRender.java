@@ -20,6 +20,7 @@ import mindustry.game.Team;
 import mindustry.gen.Building;
 import mindustry.gen.Legsc;
 import mindustry.gen.Unit;
+import mindustry.graphics.Layer;
 import mindustry.type.UnitType;
 import mindustry.world.Block;
 import mindustry.world.blocks.defense.turrets.Turret;
@@ -58,7 +59,7 @@ public class IconRender {
       } catch (Throwable ignored) {
       }
       for (UnitType type : Vars.content.units()) {
-         if (!ours(type)) continue;
+         if (!ours(type) || !Core.atlas.has(type.name + "-icon")) continue; // units without an own icon keep the game's one
          TextureRegion r = render(size(type.fullIcon, type.hitSize * 3.0F), () -> unit(type), dir.child(type.name.replace("anomalies-", "") + "-icon.png"));
          if (r != null) {
             type.fullIcon = r;
@@ -105,6 +106,7 @@ public class IconRender {
    static void building(Block block) {
       Building b = block.newBuilding().create(block, TEAM);
       b.set(0.0F, 0.0F);
+      Draw.z(Layer.block); // the game draws buildings on the block layer; parts above it set their own layer
       b.draw();
    }
 

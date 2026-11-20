@@ -3,41 +3,55 @@ package anomalies;
 import arc.Core;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.Lines;
 import arc.graphics.g2d.TextureRegion;
-import arc.math.Angles;
 import arc.math.Mathf;
 import arc.util.Time;
+import arc.util.Tmp;
 import mindustry.content.Fx;
-import mindustry.entities.part.HoverPart;
 import mindustry.entities.units.WeaponMount;
 import mindustry.gen.ElevationMoveUnit;
-import mindustry.gen.Sounds;
 import mindustry.gen.Unit;
-import mindustry.graphics.Layer;
 import mindustry.type.UnitType;
 import mindustry.type.Weapon;
 
+import java.util.WeakHashMap;
+
 /**
- * Gvozdika: tier 2 ground hover unit, the upgrade of the Lavanda (additive reconstructor). Sprites share an 80x80 canvas
- * (4 px = 1 world unit), the unit centre is the canvas centre:
- * - gvozdika.png the hull; gvozdika-gun.png the main turret (body + barrel), turns around the unit centre and recoils;
- *   gvozdika-cell.png the white piece at the back of the main turret: the cell (team colour), turns and recoils with the turret;
- *   gvozdika-cell-outline.png its dark outline, drawn on top in its own colour (not tinted);
- * - gvozdika-side-l.png / gvozdika-side-r.png the 4 side turrets (16x22, the centre of the sprite is the pivot), each turns on its own;
- * - main turret: the Demolisher shell in glowing violet, 60 damage, once a second;
- * - side turrets: regular bullets in glowing violet, 10 damage, each turret reloads in 0.5 s, they fire in turn 1, 2, 3, 4
- *   (top left, top right, bottom right, bottom left) and again;
- * - big hover rings (the Elude effect) under each side turret, so that the glow shows from under the hull.
+ * Gvozdika: tier 2 ground hover unit, the upgrade of the Lavanda (additive reconstructor). Sprites are cut from GVOZDIKA.ase
+ * (4 px = 1 world unit), every piece is centred on its own pivot:
+ * - gvozdika.png the hull, gvozdika-cell.png the cell (the three white pieces, team colour);
+ * - gvozdika-gun.png the gun: fixed to the hull (the whole unit turns to the target), it kicks back a little at every shot;
+ *   it fires the Demolisher shell in glowing violet (60 damage, once a second);
+ * - gvozdika-leg-0..3.png the 4 diagonal legs (left front, left rear, right front, right rear), they work like the Fialka's:
+ *   while the unit moves each leg turns backwards around the point where it enters the hull, and while the unit turns all legs
+ *   swing towards the turn; a hover ring (the Elude effect) sits under every foot and moves with it.
  */
 public class GvozdikaUnit extends UnitType {
-   /** side turret pivots (local units: x to the side, y forward) in firing order: top left, top right, bottom right, bottom left */
-   static final float[][] SIDE = new float[][]{{-4.5F, 4.0F}, {4.5F, 4.0F}, {4.5F, -5.25F}, {-4.5F, -5.25F}};
-   /** reload of every side turret, ticks (0.5 s) */
-   static final float SIDE_RELOAD = 30.0F;
-   /** the main turret: reload, ticks (1 s) */
-   static final float MAIN_RELOAD = 60.0F;
-   TextureRegion cellRegion, cellOutlineRegion;
+   /** legs: pivot (local units: x to the side, y forward) and the foot centre relative to the pivot */
+   static final float[][] LEG_PIVOT = {{-1.25F, 1.5F}, {-1.5F, -1.25F}, {1.25F, 1.5F}, {1.5F, -1.25F}};
+   static final float[][] LEG_FOOT = {{-4.0F, 3.74F}, {-3.8F, -4.05F}, {4.05F, 3.8F}, {3.84F, -4.11F}};
+   /** how far the legs turn back while moving, degrees */
+   static final float LEG_TILT = 30.0F;
+   /** how far all the legs swing towards the side the unit is turning to, degrees (at full turn speed) */
+   static final float LEG_TURN = 30.0F;
+   /** how fast a leg turns to its angle, degrees per tick */
+   static final float LEG_SPEED = 4.0F;
+   static final Color HOVER = Color.valueOf("bf92f9");
+   static final WeakHashMap<Unit, Legs> LEGS = new WeakHashMap<>();
+
+   TextureRegion[] legs = new TextureRegion[4];
    Weapon main;
+
+   /** per unit leg state */
+   static class Legs {
+      /** current turn of every leg relative to the hull, degrees */
+      float[] leg = new float[4];
+      /** how fast the unit is turning: -1 (right, full speed) .. 1 (left, full speed), smoothed */
+      float turn;
+      /** the unit rotation on the previous update */
+      float lastRot = Float.NaN;
+   }
 
    public GvozdikaUnit(String name) {
       super(name);
@@ -49,77 +63,69 @@ public class GvozdikaUnit extends UnitType {
       this.health = 550.0F;
       this.armor = 4.0F;
       this.speed = 0.85F;
-      this.hitSize = 17.0F;
+      this.hitSize = 15.0F;
       this.rotateSpeed = 4.0F;
-      this.faceTarget = false; // the turrets turn by themselves, the hull keeps facing where it moves
+      this.faceTarget = true; // the gun is fixed to the hull: the whole unit turns to the target
       this.targetAir = true;
       this.targetGround = true;
       this.outlines = false;
-      this.drawCell = false;
+      this.drawCell = true;
       this.engineSize = 0.0F;
 
-      // the main turret: turns around the unit centre, small recoil, the Demolisher shell in violet
+      // the gun: fixed to the hull (does not turn by itself), small recoil, the Demolisher shell in violet
       Weapon gun = new Weapon("anomalies-gvozdika-gun");
       gun.x = 0.0F;
       gun.y = 0.0F;
-      gun.shootY = 8.0F;
+      gun.shootY = 10.5F; // the muzzle
       gun.mirror = false;
-      gun.rotate = true;
-      gun.rotateSpeed = 6.0F;
-      gun.reload = MAIN_RELOAD;
-      gun.recoil = 1.5F;
-      gun.recoilTime = 20.0F;
+      gun.rotate = false;
+      gun.reload = 60.0F; // 1 s
+      gun.recoil = 0.75F;
+      gun.recoilTime = 14.0F;
       gun.shootCone = 8.0F;
       gun.ejectEffect = Fx.none;
       gun.shootSound = ModSounds.demolisherShot();
       gun.bullet = GvozdikaShot.main();
       this.weapons.add(gun);
       this.main = gun;
-
-      // the side turrets: each turns on its own, small recoil, they fire one after another
-      GvozdikaShot.Side sideShot = new GvozdikaShot.Side();
-      for (int i = 0; i < SIDE.length; i++) {
-         SideWeapon w = new SideWeapon(SIDE[i][0] < 0.0F ? "anomalies-gvozdika-side-l" : "anomalies-gvozdika-side-r", i);
-         w.x = SIDE[i][0];
-         w.y = SIDE[i][1];
-         w.shootY = 2.75F;
-         w.mirror = false;
-         w.rotate = true;
-         w.rotateSpeed = 9.0F;
-         w.reload = SIDE_RELOAD;
-         w.recoil = 1.0F;
-         w.recoilTime = 10.0F;
-         w.shootCone = 10.0F;
-         w.ejectEffect = Fx.casing1;
-         w.shootSound = Sounds.shoot;
-         w.bullet = sideShot;
-         this.weapons.add(w);
-      }
-
-      // levitation: big hover rings under each side turret (the Elude effect), they glow out from under the hull
-      for (float[] h : new float[][]{{4.5F, 4.0F}, {4.5F, -5.25F}}) {
-         final float hx = h[0], hy = h[1];
-         this.parts.add(new HoverPart() {{
-            x = hx;
-            y = hy;
-            mirror = true;
-            radius = 9.0F;
-            phase = 90.0F;
-            stroke = 2.5F;
-            layerOffset = -0.001F;
-            color = Color.valueOf("bf92f9");
-         }});
-      }
    }
 
    public void load() {
       super.load();
-      this.cellRegion = Core.atlas.find(this.name + "-cell");
-      this.cellOutlineRegion = Core.atlas.find(this.name + "-cell-outline");
+      for (int i = 0; i < 4; i++) this.legs[i] = Core.atlas.find(this.name + "-leg-" + i);
       if (Core.atlas.has(this.name + "-icon")) {
          TextureRegion icon = Core.atlas.find(this.name + "-icon");
          this.fullIcon = icon;
          this.uiIcon = icon;
+      }
+   }
+
+   static float signedDiff(float to, float from) {
+      return ((to - from) % 360.0F + 540.0F) % 360.0F - 180.0F;
+   }
+
+   @Override
+   public void update(Unit unit) {
+      super.update(unit);
+      Legs l = LEGS.get(unit);
+      if (l == null) LEGS.put(unit, l = new Legs());
+      float v = unit.deltaLen() / Math.max(Time.delta, 0.001F);
+      // turning: the angle the hull turned this tick, against the most it can turn (left = positive)
+      float turned = Float.isNaN(l.lastRot) ? 0.0F : signedDiff(unit.rotation, l.lastRot) / Math.max(Time.delta, 0.001F);
+      l.lastRot = unit.rotation;
+      l.turn = Mathf.lerpDelta(l.turn, Mathf.clamp(turned / this.rotateSpeed, -1.0F, 1.0F), 0.15F);
+      // every leg turns to its angle (backwards while moving + towards the turn) at most LEG_SPEED degrees per tick
+      for (int i = 0; i < 4; i++) {
+         float side = LEG_PIVOT[i][0] < 0.0F ? 1.0F : -1.0F; // backwards: left legs counter-clockwise, right legs clockwise
+         float want = side * LEG_TILT * (v > 0.15F ? 1.0F : 0.0F) + LEG_TURN * l.turn;
+         l.leg[i] = Mathf.approachDelta(l.leg[i], want, LEG_SPEED);
+      }
+      // a unit under a player's command (CommandAI) never turns to its target by itself: when it stands still and the gun has
+      // a target, the hull turns to it, so the fixed gun can look at it
+      if (!unit.isPlayer() && !unit.moving()) {
+         for (WeaponMount m : unit.mounts) {
+            if (m.weapon == this.main && m.shoot) unit.lookAt(m.aimX, m.aimY);
+         }
       }
    }
 
@@ -134,93 +140,46 @@ public class GvozdikaUnit extends UnitType {
    public void drawSoftShadow(float x, float y, float rotation, float alpha) {
    }
 
-   public void draw(Unit unit) {
-      float z = UnitZ.of(this, unit); // the body layer: the cell goes on it, after the turrets (see UnitZ)
+   @Override
+   public Color cellColor(Unit unit) {
+      return TeamTint.cell(unit);
+   }
 
-      // hull, turrets (with their recoil) and hover rings
+   public void draw(Unit unit) {
+      // every piece goes on the body layer, in drawing order (see UnitZ), so the unit never mixes with other units
+      float z = UnitZ.of(this, unit);
+      float rot = unit.rotation - 90.0F;
+      Legs l = unit.isAdded() ? LEGS.get(unit) : null;
+      if (l == null) l = new Legs(); // legs at rest (payload, icon)
+
+      // hover rings under the feet, then the legs
+      for (int i = 0; i < 4; i++) {
+         Tmp.v1.set(LEG_PIVOT[i][0], LEG_PIVOT[i][1]).rotate(rot);
+         Tmp.v2.set(LEG_FOOT[i][0], LEG_FOOT[i][1]).rotate(rot + l.leg[i]);
+         float fx = unit.x + Tmp.v1.x + Tmp.v2.x, fy = unit.y + Tmp.v1.y + Tmp.v2.y;
+         Draw.z(z - 0.001F); // the glow lies on the ground, under the units (like the Elude hover part)
+         Draw.color(HOVER);
+         for (int c = 0; c < 2; c++) {
+            float fin = (Time.time / 90.0F + c / 2.0F) % 1.0F;
+            Lines.stroke((1.0F - fin) * 2.5F + 0.12F);
+            Lines.poly(fx, fy, 4, 8.0F * fin, unit.rotation);
+         }
+         Draw.reset();
+      }
+      Draw.z(z);
+      for (int i = 0; i < 4; i++) {
+         Tmp.v1.set(LEG_PIVOT[i][0], LEG_PIVOT[i][1]).rotate(rot);
+         Draw.rect(this.legs[i], unit.x + Tmp.v1.x, unit.y + Tmp.v1.y, rot + l.leg[i]);
+      }
+
+      // hull, cell and gun (with its recoil) over the legs
       TurretPatch.shadowOff();
       try {
          super.draw(unit);
       } finally {
          TurretPatch.shadowOn();
       }
-
-      // the cell sits on the back of the main turret: turns and recoils with it; dark and pulsing when damaged, otherwise the team colour
-      WeaponMount m = null;
-      for (WeaponMount mount : unit.mounts) {
-         if (mount.weapon == this.main) m = mount;
-      }
-      float rot = unit.rotation - 90.0F;
-      float tr = m == null ? rot : rot + m.rotation;
-      float kick = m == null ? 0.0F : (float)Math.pow((double)m.recoil, 1.8D) * this.main.recoil;
-      float tx = unit.x + Angles.trnsx(tr, 0.0F, -kick);
-      float ty = unit.y + Angles.trnsy(tr, 0.0F, -kick);
-      Draw.z(z);
-      Draw.color(TeamTint.cell(unit));
-      Draw.rect(this.cellRegion, tx, ty, tr);
-      // the dark outline of the cell keeps its own colour
-      Draw.color();
-      Draw.rect(this.cellOutlineRegion, tx, ty, tr);
       Draw.reset();
-   }
-
-   /**
-    * A side turret that keeps the firing order: it may only fire when it is its turn (the next turret with a target after the
-    * one that fired last) and a quarter of the reload has passed since that shot.
-    */
-   public static class SideWeapon extends Weapon {
-      final int order;
-
-      public SideWeapon(String name, int order) {
-         super(name);
-         this.order = order;
-         this.mountType = SideMount::new;
-      }
-
-      @Override
-      public void update(Unit unit, WeaponMount mount) {
-         SideMount[] side = new SideMount[SIDE.length];
-         for (WeaponMount wm : unit.mounts) {
-            if (wm instanceof SideMount && wm.weapon instanceof SideWeapon) {
-               int o = ((SideWeapon)wm.weapon).order;
-               if (o >= 0 && o < side.length) side[o] = (SideMount)wm;
-            }
-         }
-         // the turret that fired last
-         int last = -1;
-         for (int i = 0; i < side.length; i++) {
-            if (side[i] != null && side[i].lastShot > -1.0E8F && (last < 0 || side[i].lastShot > side[last].lastShot)) last = i;
-         }
-         // its turn: the next turret after it (1, 2, 3, 4, 1...) that has a target; a turret without a target is skipped,
-         // so the others never wait for it
-         int turn = -1;
-         for (int k = 1; k <= side.length; k++) {
-            int i = (last + k + side.length) % side.length;
-            if (side[i] != null && side[i].shoot) {
-               turn = i;
-               break;
-            }
-         }
-         float gap = this.reload / side.length / Math.max(unit.reloadMultiplier, 0.01F);
-         boolean allowed = turn == this.order && (last < 0 || Time.time - side[last].lastShot >= gap);
-         if (!allowed) {
-            // hold the shot (it still turns towards the target)
-            mount.reload = Math.max(mount.reload, Time.delta * unit.reloadMultiplier + 0.01F);
-         }
-         float before = mount.reload;
-         super.update(unit, mount);
-         if (mount.reload > before + 0.001F && mount instanceof SideMount) {
-            ((SideMount)mount).lastShot = Time.time;
-         }
-      }
-   }
-
-   public static class SideMount extends WeaponMount {
-      /** when this turret fired last (Time.time), never = -1e9 */
-      public float lastShot = -1.0E9F;
-
-      public SideMount(Weapon weapon) {
-         super(weapon);
-      }
+      Draw.z(z);
    }
 }

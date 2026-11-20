@@ -19,7 +19,6 @@ import mindustry.ai.types.CommandAI;
 import mindustry.content.Fx;
 import mindustry.entities.Effect;
 import mindustry.entities.Units;
-import mindustry.entities.bullet.BasicBulletType;
 import mindustry.entities.units.WeaponMount;
 import mindustry.gen.Building;
 import mindustry.gen.Teamc;
@@ -47,10 +46,10 @@ import java.util.WeakHashMap;
  * Excavator: a ground hover unit (like the Elude) with 6 orange hover rings, 3 along each side. It cannot climb walls: it goes
  * around them like any ground unit. Sprites are cut from excavator.ase (4 px = 1 world unit):
  * - excavator.png the body, excavator-cell.png the cell (the three white pieces, team colour);
- * - excavator-gun.png the gun on top: turns, small recoil, 15 damage every 0.8 s, range 7 blocks;
+ * - no gun: the saws are its only weapon;
  * - excavator-saw.png the three saws on the front edge: they spin while working.
  * Saws: while working they hurt everything they touch (1 damage every 0.1 s) and throw bright orange sparks. Walls are cut down
- * by the saws in one minute whatever their health: either command the unit to attack the wall (it walks up to it and starts
+ * by the saws in 30 seconds whatever their health: either command the unit to attack the wall (it walks up to it and starts
  * cutting), or drive it yourself right up to the wall and hold the fire button.
  */
 public class ExcavatorUnit extends UnitType {
@@ -60,8 +59,8 @@ public class ExcavatorUnit extends UnitType {
    static final float SAW_REACH = 2.6F;
    /** saw damage and its interval: 1 damage every 0.1 s */
    static final float SAW_DAMAGE = 1.0F, SAW_INTERVAL = 6.0F;
-   /** a wall is cut down in this many ticks (1 minute) */
-   static final float WALL_TIME = 60.0F * 60.0F;
+   /** a wall is cut down in this many ticks (30 seconds) */
+   static final float WALL_TIME = 30.0F * 60.0F;
    /** saw spin while working, degrees per tick */
    static final float SAW_SPIN = 18.0F;
 
@@ -130,7 +129,7 @@ public class ExcavatorUnit extends UnitType {
    static float dragX, dragY;
 
    static boolean excavatorsSelected() {
-      for (Unit u : Vars.control.input.selectedUnits) if (u.type instanceof ExcavatorUnit) return true;
+      for (Unit u : Vars.control.input.selectedUnits) if (u.controller() instanceof ExcavatorAI) return true; // excavators and laser crushers
       return false;
    }
 
@@ -165,7 +164,7 @@ public class ExcavatorUnit extends UnitType {
          if (r[2] - r[0] < 1 && r[3] - r[1] < 1) return; // a click, not a box: the usual order
          Zone zone = new Zone(r[0], r[1], r[2], r[3]);
          for (Unit u : Vars.control.input.selectedUnits) {
-            if (u.type instanceof ExcavatorUnit && u.controller() instanceof ExcavatorAI) ((ExcavatorAI)u.controller()).setZone(zone);
+            if (u.controller() instanceof ExcavatorAI) ((ExcavatorAI)u.controller()).setZone(zone);
          }
          Fx.attackCommand.at((r[0] + r[2]) / 2.0F * Vars.tilesize, (r[1] + r[3]) / 2.0F * Vars.tilesize);
       }
@@ -238,34 +237,7 @@ public class ExcavatorUnit extends UnitType {
       this.drawCell = true;
       this.targetAir = true;
       this.targetGround = true;
-
-      Weapon gun = new Weapon("anomalies-excavator-gun");
-      gun.x = 0.0F;
-      gun.y = -1.0F;
-      gun.shootY = 3.0F;
-      gun.mirror = false;
-      gun.rotate = true;
-      gun.rotateSpeed = 6.0F;
-      gun.reload = 48.0F; // 0.8 s
-      gun.recoil = 1.0F;
-      gun.recoilTime = 14.0F;
-      gun.shootCone = 8.0F;
-      gun.ejectEffect = Fx.casing1;
-      gun.shootSound = Sounds.shoot;
-      BasicBulletType b = new BasicBulletType(3.0F, 15.0F);
-      b.lifetime = 19.0F; // range ~57 = 7 blocks
-      b.width = 7.0F;
-      b.height = 10.0F;
-      b.frontColor = Color.valueOf("ffd2a8");
-      b.backColor = Color.valueOf("f0693a");
-      b.hitColor = b.backColor;
-      b.keepVelocity = false;
-      b.shootEffect = Fx.shootSmall;
-      b.smokeEffect = Fx.shootSmallSmoke;
-      b.hitEffect = Fx.hitBulletColor;
-      b.despawnEffect = Fx.hitBulletColor;
-      gun.bullet = b;
-      this.weapons.add(gun);
+      // no gun: the excavator only has its saws
    }
 
    public void load() {
@@ -315,6 +287,8 @@ public class ExcavatorUnit extends UnitType {
             if (terrainWall(t) && (wall == null || t == cutTile)) wall = t;
          }
       }
+      // a commanded excavator cuts only its own wall, never the one next to it (that may be another excavator's)
+      if (cutTile != null && wall != cutTile) wall = null;
       boolean commanded = wall != null && cutTile != null;
       boolean playerSaw = unit.isPlayer() && unit.isShooting();
 
@@ -344,7 +318,7 @@ public class ExcavatorUnit extends UnitType {
       }
       if (Vars.net.client()) return;
 
-      // the terrain wall: one tile is cut out in one minute (several excavators on one tile cut it faster)
+      // the terrain wall: one tile is cut out in 30 seconds (several excavators on one tile cut it faster)
       if (cutWall) {
          float p = CUT.get(wall.pos(), 0.0F) + Time.delta / WALL_TIME;
          if (p >= 1.0F) {
@@ -421,7 +395,7 @@ public class ExcavatorUnit extends UnitType {
          Draw.z(z);
       }
 
-      // body, cell and gun
+      // body and cell
       TurretPatch.shadowOff();
       try {
          super.draw(unit);
@@ -448,6 +422,13 @@ public class ExcavatorUnit extends UnitType {
       /** zone tiles it could not reach, tried again later */
       final IntSet skip = new IntSet();
       float skipTimer, pickTimer;
+      /** it has reached cutTile once: from then on it never gives the tile up, it only walks back when pushed away */
+      boolean arrived;
+
+      void setCut(Tile t) {
+         if (t != this.cutTile) this.arrived = false;
+         this.cutTile = t;
+      }
 
       @Override
       public void commandPosition(Vec2 pos, boolean stopWhenInRange) {
@@ -457,6 +438,7 @@ public class ExcavatorUnit extends UnitType {
          if (terrainWall(t)) {
             // the wall is the target: the unit walks to the free tile next to it and cuts it
             this.cutTile = t;
+            this.arrived = false;
             Tile st = this.standTile(t, null);
             super.commandPosition(st != null ? new Vec2(st.worldx(), st.worldy()) : pos, false);
             if (!Vars.headless) Fx.attackCommand.at(t.worldx(), t.worldy()); // the same red mark as an attack order
@@ -496,10 +478,21 @@ public class ExcavatorUnit extends UnitType {
          this.zone = z;
       }
 
-      /** the other excavators of this team that work right now */
+      /** false: it does not press against the wall, it works from a distance (the laser crusher) */
+      public boolean press = true;
+
+      public ExcavatorAI() {
+      }
+
+      public ExcavatorAI(boolean press) {
+         this.press = press;
+      }
+
+      /** the other wall cutters of this team (excavators and laser crushers), so they share the walls of a zone */
       Seq<Unit> mates() {
-         Seq<Unit> s = this.unit.team.data().unitCache(this.unit.type);
-         return s == null ? new Seq<>() : s;
+         Seq<Unit> s = new Seq<>();
+         for (Unit u : this.unit.team.data().units) if (u.controller() instanceof ExcavatorAI) s.add(u);
+         return s;
       }
 
       static ExcavatorAI ai(Unit u) {
@@ -560,7 +553,7 @@ public class ExcavatorUnit extends UnitType {
             if (!this.zone.hasWalls()) this.zone = null; // all cleared: done
             return;
          }
-         this.cutTile = t;
+         this.setCut(t);
          super.commandPosition(new Vec2(this.stand.worldx(), this.stand.worldy()), false);
       }
 
@@ -607,17 +600,28 @@ public class ExcavatorUnit extends UnitType {
          if (this.cutTile != null) this.group = null;
          super.defaultBehavior();
          if (this.cutTile != null && this.targetPos == null) {
-            if (this.zone != null && !this.unit.within(this.cutTile.worldx(), this.cutTile.worldy(), Vars.tilesize * 2.3F + this.unit.hitSize / 2.0F)) {
-               // the path ended far from the wall (it cannot be reached): take another one, try this one later
-               this.skip.add(this.cutTile.pos());
-               this.cutTile = null;
-               this.stand = null;
-               this.pickTimer = 0.0F;
-               return;
+            boolean near = this.unit.within(this.cutTile.worldx(), this.cutTile.worldy(), Vars.tilesize * 2.3F + this.unit.hitSize / 2.0F);
+            if (!this.arrived) {
+               if (this.zone != null && !near && CUT.get(this.cutTile.pos(), 0.0F) <= 0.0F) {
+                  // the path ended far from the wall (it cannot be reached): take another one, try this one later
+                  this.skip.add(this.cutTile.pos());
+                  this.cutTile = null;
+                  this.stand = null;
+                  this.pickTimer = 0.0F;
+                  return;
+               }
+               this.arrived = true;
+            } else if (!this.unit.within(this.cutTile.worldx(), this.cutTile.worldy(), Vars.tilesize * 3.5F + this.unit.hitSize / 2.0F)) {
+               // pushed away from its wall (by the other excavators): walk back to it, the wall stays its own
+               Tile st = this.stand != null ? this.stand : this.standTile(this.cutTile, null);
+               if (st != null) {
+                  super.commandPosition(new Vec2(st.worldx(), st.worldy()), false);
+                  return;
+               }
             }
             // arrived: turn the saws to the wall and press against it (the wall stops the unit)
             this.unit.lookAt(this.cutTile.worldx(), this.cutTile.worldy());
-            if (Angles.within(this.unit.rotation, this.unit.angleTo(this.cutTile.worldx(), this.cutTile.worldy()), 20.0F)) {
+            if (this.press && Angles.within(this.unit.rotation, this.unit.angleTo(this.cutTile.worldx(), this.cutTile.worldy()), 20.0F)) {
                this.moveTo(this.cutTile, 0.0F);
             }
          }

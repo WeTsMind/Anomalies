@@ -18,6 +18,7 @@ public class AnomalyModFixed extends AnomalyModGolden {
    public static UnitType gvozdika;
    public static UnitType fialka;
    public static UnitType excavator;
+   public static UnitType laserCrusher;
    public static UnitType test01;
    public static Block demolisher;
    public static Block cutter;
@@ -155,6 +156,12 @@ public class AnomalyModFixed extends AnomalyModGolden {
       }
 
       try {
+         laserCrusher = new LaserCrusherUnit("laser-crusher");
+      } catch (Throwable e) {
+         Log.err(e);
+      }
+
+      try {
          test01 = new Test01Unit("test01");
       } catch (Throwable var17) {
          Log.err(var17);
@@ -167,6 +174,7 @@ public class AnomalyModFixed extends AnomalyModGolden {
       AnomalyShaders.load();
       DataSystem.init();
       IconRender.init();
+      RubyOre.init();
       fix("anomalies-alloy");
       fix("anomalies-golden-ratio");
       fix("anomalies-arux");
