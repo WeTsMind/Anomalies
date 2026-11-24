@@ -120,6 +120,19 @@ public class ExcavatorUnit extends UnitType {
       }
    }
 
+   /**
+    * What the zone orders and the wall sharing need from a wall cutter's AI. The Excavator (ExcavatorAI) and the laser crusher
+    * (LaserCrusherAI) have separate AIs; this is all they share.
+    */
+   public interface WallCutter {
+      /** the wall it is cutting or going to, null = none */
+      Tile cutTile();
+
+      Zone zone();
+
+      void setZone(Zone z);
+   }
+
    /** the biggest zone side, tiles */
    static final int ZONE_MAX = 80;
    static final Color ZONE = Color.valueOf("ff9a3c");
@@ -129,7 +142,7 @@ public class ExcavatorUnit extends UnitType {
    static float dragX, dragY;
 
    static boolean excavatorsSelected() {
-      for (Unit u : Vars.control.input.selectedUnits) if (u.controller() instanceof ExcavatorAI) return true; // excavators and laser crushers
+      for (Unit u : Vars.control.input.selectedUnits) if (u.controller() instanceof WallCutter) return true; // excavators and laser crushers
       return false;
    }
 
@@ -164,7 +177,7 @@ public class ExcavatorUnit extends UnitType {
          if (r[2] - r[0] < 1 && r[3] - r[1] < 1) return; // a click, not a box: the usual order
          Zone zone = new Zone(r[0], r[1], r[2], r[3]);
          for (Unit u : Vars.control.input.selectedUnits) {
-            if (u.controller() instanceof ExcavatorAI) ((ExcavatorAI)u.controller()).setZone(zone);
+            if (u.controller() instanceof WallCutter) ((WallCutter)u.controller()).setZone(zone);
          }
          Fx.attackCommand.at((r[0] + r[2]) / 2.0F * Vars.tilesize, (r[1] + r[3]) / 2.0F * Vars.tilesize);
       }
@@ -187,8 +200,8 @@ public class ExcavatorUnit extends UnitType {
       Draw.z(Layer.overlayUI - 0.1F);
       Zone last = null;
       for (Unit u : Vars.control.input.selectedUnits) {
-         if (!(u.controller() instanceof ExcavatorAI)) continue;
-         Zone z = ((ExcavatorAI)u.controller()).zone;
+         if (!(u.controller() instanceof WallCutter)) continue;
+         Zone z = ((WallCutter)u.controller()).zone();
          if (z == null || z == last) continue;
          last = z;
          drawZoneRect(z.x1, z.y1, z.x2, z.y2, 0.08F);
@@ -410,7 +423,17 @@ public class ExcavatorUnit extends UnitType {
     * free tile next to that wall that is closest to it, then presses its saws against the wall and cuts it out; when the tile
     * is gone it is done. Any other command cancels the cutting.
     */
-   public static class ExcavatorAI extends CommandAI {
+   public static class ExcavatorAI extends CommandAI implements WallCutter {
+      @Override
+      public Tile cutTile() {
+         return this.cutTile;
+      }
+
+      @Override
+      public Zone zone() {
+         return this.zone;
+      }
+
       /** the terrain wall tile it is cutting (or going to), null = none */
       public Tile cutTile;
       /** the free tile it stands on to cut cutTile (zone work), null = none */
@@ -465,6 +488,7 @@ public class ExcavatorUnit extends UnitType {
       }
 
       /** the zone order: clear every terrain wall inside the zone */
+      @Override
       public void setZone(Zone z) {
          this.commandQueue.clear();
          this.targetPos = null;
@@ -478,27 +502,24 @@ public class ExcavatorUnit extends UnitType {
          this.zone = z;
       }
 
-      /** false: it does not press against the wall, it works from a distance (the laser crusher) */
-      public boolean press = true;
-      /** a unit that works from a distance: how far from the wall centre it can still work, world units; 0 = none */
-      public float reach;
-
-      public ExcavatorAI() {
-      }
-
-      public ExcavatorAI(boolean press) {
-         this.press = press;
+      /** how close to the wall centre the saws can work on it: from a neighbouring tile */
+      float workDist() {
+         return Vars.tilesize * 1.6F + this.unit.hitSize / 2.0F;
       }
 
       /** the other wall cutters of this team (excavators and laser crushers), so they share the walls of a zone */
       Seq<Unit> mates() {
          Seq<Unit> s = new Seq<>();
-         for (Unit u : this.unit.team.data().units) if (u.controller() instanceof ExcavatorAI) s.add(u);
+         for (Unit u : this.unit.team.data().units) if (u.controller() instanceof WallCutter) s.add(u);
          return s;
       }
 
       static ExcavatorAI ai(Unit u) {
          return u.controller() instanceof ExcavatorAI ? (ExcavatorAI)u.controller() : null;
+      }
+
+      static Tile cutOf(Unit u) {
+         return u.controller() instanceof WallCutter ? ((WallCutter)u.controller()).cutTile() : null;
       }
 
       /** takes the next wall of the zone: free, reachable from a free side, away from the other diggers, next to its own lane */
@@ -514,13 +535,13 @@ public class ExcavatorUnit extends UnitType {
                boolean taken = false;
                float crowd = 0.0F;
                for (Unit m : mates) {
-                  ExcavatorAI o = ai(m);
-                  if (m == this.unit || o == null || o.cutTile == null) continue;
-                  if (o.cutTile == t) {
+                  Tile o = cutOf(m);
+                  if (m == this.unit || o == null) continue;
+                  if (o == t) {
                      taken = true;
                      break;
                   }
-                  float d = Mathf.dst(o.cutTile.x, o.cutTile.y, t.x, t.y);
+                  float d = Mathf.dst(o.x, o.y, t.x, t.y);
                   if (d < 4.0F) crowd += (4.0F - d) * Vars.tilesize * 6.0F; // keep away from the others: own lanes
                }
                if (taken) continue;
@@ -600,6 +621,12 @@ public class ExcavatorUnit extends UnitType {
          // when several units are sent together, the formation would spread them away from the wall: every excavator goes
          // straight to its own place next to the wall instead
          if (this.cutTile != null) this.group = null;
+         // close enough to the wall to work on it: the path is done. The vanilla AI only ends it within 6 units of the stand
+         // tile, which a unit never reaches when another one stands on it or blocks the way: it would walk there forever
+         if (this.cutTile != null && this.targetPos != null && this.commandQueue.isEmpty()
+            && this.unit.within(this.cutTile.worldx(), this.cutTile.worldy(), this.workDist())) {
+            this.targetPos = null;
+         }
          super.defaultBehavior();
          if (this.cutTile != null && this.targetPos == null) {
             boolean near = this.unit.within(this.cutTile.worldx(), this.cutTile.worldy(), Vars.tilesize * 2.3F + this.unit.hitSize / 2.0F);
@@ -621,14 +648,9 @@ public class ExcavatorUnit extends UnitType {
                   return;
                }
             }
-            // a unit that works from a distance (the laser): when the wall drifted out of its reach (a leg step, a push),
-            // step closer again, straight to the wall
-            if (this.reach > 0.0F && !this.unit.within(this.cutTile.worldx(), this.cutTile.worldy(), this.reach - 2.0F)) {
-               this.moveTo(this.cutTile, this.reach - 5.0F);
-            }
             // arrived: turn the saws to the wall and press against it (the wall stops the unit)
             this.unit.lookAt(this.cutTile.worldx(), this.cutTile.worldy());
-            if (this.press && Angles.within(this.unit.rotation, this.unit.angleTo(this.cutTile.worldx(), this.cutTile.worldy()), 20.0F)) {
+            if (Angles.within(this.unit.rotation, this.unit.angleTo(this.cutTile.worldx(), this.cutTile.worldy()), 20.0F)) {
                this.moveTo(this.cutTile, 0.0F);
             }
          }

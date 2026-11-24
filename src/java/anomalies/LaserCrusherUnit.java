@@ -73,9 +73,7 @@ public class LaserCrusherUnit extends UnitType {
       this.constructor = LegsUnit::create;
       this.controller = u -> {
          if (!this.playerControllable || (u.team.isAI() && !u.team.rules().rtsAi)) return this.aiController.get();
-         ExcavatorUnit.ExcavatorAI ai = new ExcavatorUnit.ExcavatorAI(false);
-         ai.reach = this.reachFromCentre(); // keeps the wall within the laser's reach
-         return ai;
+         return new LaserCrusherAI(this.reachFromCentre()); // its own AI, not the Excavator's
       };
       this.alwaysUnlocked = true;
       this.health = 650.0F;
@@ -140,9 +138,9 @@ public class LaserCrusherUnit extends UnitType {
       super.update(unit);
       State s = state(unit);
       Tile wall = null;
-      if (unit.controller() instanceof ExcavatorUnit.ExcavatorAI) {
+      if (unit.controller() instanceof LaserCrusherAI) {
          // ordered: only its own wall
-         Tile t = ((ExcavatorUnit.ExcavatorAI)unit.controller()).cutTile;
+         Tile t = ((LaserCrusherAI)unit.controller()).cutTile;
          if (ExcavatorUnit.terrainWall(t) && this.inReach(unit, t)) wall = t;
       } else if (unit.isPlayer() && unit.isShooting()) {
          // driven by a player: the wall under the cursor
@@ -230,9 +228,9 @@ public class LaserCrusherUnit extends UnitType {
       }
 
       // command mode: the wall this unit was sent to crush is marked like an attack target
-      if (unit.controller() instanceof ExcavatorUnit.ExcavatorAI && ((ExcavatorUnit.ExcavatorAI)unit.controller()).cutTile != null
+      if (unit.controller() instanceof LaserCrusherAI && ((LaserCrusherAI)unit.controller()).cutTile != null
          && Vars.control != null && Vars.control.input.commandMode && Vars.control.input.selectedUnits.contains(unit)) {
-         Tile t = ((ExcavatorUnit.ExcavatorAI)unit.controller()).cutTile;
+         Tile t = ((LaserCrusherAI)unit.controller()).cutTile;
          Draw.z(Layer.overlayUI);
          Drawf.target(t.worldx(), t.worldy(), 6.0F, Pal.remove);
          Draw.reset();
