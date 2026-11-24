@@ -32,7 +32,7 @@ import mindustry.world.meta.BuildVisibility;
 /** Powered block with three lasers that burn through the walls in front of it, 30 seconds per wall tile. */
 public class WallBreaker extends Block {
    static final float breakTime = 1800.0F; // 30 seconds at 60 ticks/sec
-   static final Color laserCol = Color.valueOf("5DFF7A");
+   static final Color laserCol = Color.valueOf("ff2a3c");
    public TextureRegion glowRegion;
    public TextureRegion linesRegion;
    public TextureRegion emitterRegion;
@@ -245,13 +245,14 @@ public class WallBreaker extends Block {
                int lane = k == 0 ? 0 : 1;
                float wx = this.laneX(lane) * 8.0F;
                float wy = this.laneY(lane) * 8.0F;
-               lat = ((wx - this.x) * px + (wy - this.y) * py) * 1.2F;
+               // side barrels of the sprite sit 5.75 units off centre, lane centres 4 units
+               lat = ((wx - this.x) * px + (wy - this.y) * py) * 1.44F;
                heat = lane == 0 ? heat0 : heat1;
                reachDepth = this.laneDepth[lane];
             }
 
-            // distance along the facing: emitters sit on the sprite, the wall face is 8 units from the centre
-            float f0 = k == 1 ? 5.5F : 2.5F;
+            // distance along the facing: all three barrel tips are at the front edge of the sprite, the wall face is 8 units from the centre
+            float f0 = 7.5F;
             float f1 = f0 + (9.5F + 8.0F * (float)reachDepth - f0) * b;
             float sx = this.x + dx * f0 + px * lat;
             float sy = this.y + dy * f0 + py * lat;
@@ -263,7 +264,7 @@ public class WallBreaker extends Block {
             if (hit && k != 1) {
                Draw.blend(Blending.additive);
                Draw.color(WallBreaker.laserCol, 0.15F + 0.45F * heat);
-               Fill.square(this.x + dx * (12.0F + 8.0F * (float)reachDepth) + px * (lat / 1.2F), this.y + dy * (12.0F + 8.0F * (float)reachDepth) + py * (lat / 1.2F), 4.0F);
+               Fill.square(this.x + dx * (12.0F + 8.0F * (float)reachDepth) + px * (lat / 1.44F), this.y + dy * (12.0F + 8.0F * (float)reachDepth) + py * (lat / 1.44F), 4.0F);
                Draw.blend();
             }
 

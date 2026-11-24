@@ -48,7 +48,7 @@ public class AlloyUnit extends UnitType {
       super(var1);
       this.constructor = LegsUnit::create;
       this.alwaysUnlocked = true;
-      this.health = 1800.0F;
+      this.health = 550.0F;
       this.armor = 4.0F;
       this.speed = 0.5F;
       this.hitSize = 18.0F;
@@ -60,7 +60,11 @@ public class AlloyUnit extends UnitType {
       this.lockLegBase = true;
       this.legCount = 6;
       this.legGroupSize = 3;
-      this.legLength = 17.0F;
+      // sprites from alloy.ase, drawn 1:1: alloy-leg.png (39 px) runs from the hull to the joint = legLength / 2;
+      // alloy-leg-base.png (outer part + foot, 54 px) starts 15 px before the joint and lies under the inner part
+      this.legLength = 19.5F;
+      this.legExtension = 3.75F;
+      this.legBaseUnder = true;
       this.legBaseOffset = 5.0F;
       this.legMoveSpace = 1.0F;
       this.legForwardScl = 0.7F;
@@ -70,7 +74,7 @@ public class AlloyUnit extends UnitType {
       this.legMinLength = 0.2F;
       this.legLengthScl = 0.96F;
       this.outlines = false;
-      this.drawCell = false;
+      this.drawCell = true; // alloy-cell.png: the white pieces at the base of the horns, team colour
       this.targetAir = true;
       this.range = 80.0F;
       this.maxRange = 80.0F;
@@ -98,6 +102,11 @@ public class AlloyUnit extends UnitType {
    public void load() {
       super.load();
       this.proj = Core.atlas.find(this.name + "-projector");
+   }
+
+   @Override
+   public Color cellColor(Unit unit) {
+      return TeamTint.cell(unit);
    }
 
    /** Computes the shield anchor (x, y, rotation) for a unit from its CURRENT state. */
@@ -245,28 +254,32 @@ public class AlloyUnit extends UnitType {
    }
 
    void drawAll(Unit var1) {
-      // the projector and the cyan lines lie on the legs layer (z - 0.02), drawn before the unit so its own legs and hull cover them;
-      // the charging ball goes on the body layer right after the body (see UnitZ), so it never floats over other units
+      // the cyan lines lie on the legs layer (z - 0.02), drawn before the unit so its own legs and hull cover them;
+      // the anomaly projector and the charging ball go on the body layer right after the hull (see UnitZ), so they sit on
+      // top of the hull but never float over other units
       float z = UnitZ.of(this, var1);
       this.drawUnder(var1, z - 0.02F);
       Draw.z(z);
       super.draw(var1);
+      if (this.proj != null && this.proj.found()) {
+         Draw.z(z);
+         Draw.reset();
+         Draw.rect(this.proj, var1.x + Mathf.cosDeg(var1.rotation) * -5.25F, var1.y + Mathf.sinDeg(var1.rotation) * -5.25F, var1.rotation - 90.0F);
+      }
       this.drawOrb(var1, z);
    }
 
    void drawUnder(Unit var1, float zUnder) {
       float var2 = var1.rotation;
-      float var3 = var1.x + Mathf.cosDeg(var2) * -4.5F;
-      float var4 = var1.y + Mathf.sinDeg(var2) * -4.5F;
+      // the projector sits 5.25 units behind the centre (alloy.ase)
+      float var3 = var1.x + Mathf.cosDeg(var2) * -5.25F;
+      float var4 = var1.y + Mathf.sinDeg(var2) * -5.25F;
       float var5 = var1.x + Mathf.cosDeg(var2) * 5.1042113F;
       float var6 = var1.y + Mathf.sinDeg(var2) * 5.1042113F;
       float var7 = 0.75F + 0.25F * Mathf.sin(Time.time * 0.5F);
-      // the projector first, the lines over it
+      // the lines start at the projector (the projector itself is drawn over the hull, in drawAll)
       Draw.z(zUnder);
       Draw.reset();
-      if (this.proj != null && this.proj.found()) {
-         Draw.rect(this.proj, var1.x + Mathf.cosDeg(var2) * -4.5F, var1.y + Mathf.sinDeg(var2) * -4.5F, var2 - 90.0F);
-      }
       Draw.blend(Blending.additive);
 
       for(int var8 = 0; var8 < 2; ++var8) {

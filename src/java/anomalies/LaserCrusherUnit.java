@@ -71,7 +71,12 @@ public class LaserCrusherUnit extends UnitType {
    public LaserCrusherUnit(String name) {
       super(name);
       this.constructor = LegsUnit::create;
-      this.controller = u -> !this.playerControllable || (u.team.isAI() && !u.team.rules().rtsAi) ? this.aiController.get() : new ExcavatorUnit.ExcavatorAI(false);
+      this.controller = u -> {
+         if (!this.playerControllable || (u.team.isAI() && !u.team.rules().rtsAi)) return this.aiController.get();
+         ExcavatorUnit.ExcavatorAI ai = new ExcavatorUnit.ExcavatorAI(false);
+         ai.reach = this.reachFromCentre(); // keeps the wall within the laser's reach
+         return ai;
+      };
       this.alwaysUnlocked = true;
       this.health = 650.0F;
       this.armor = 4.0F;
@@ -122,7 +127,12 @@ public class LaserCrusherUnit extends UnitType {
 
    /** the wall tile is within the laser's reach */
    boolean inReach(Unit unit, Tile t) {
-      return unit.dst(t.worldx(), t.worldy()) - this.hitSize / 2.0F - Vars.tilesize / 2.0F <= RANGE;
+      return unit.within(t.worldx(), t.worldy(), this.reachFromCentre());
+   }
+
+   /** the laser reach measured from the unit centre to the wall tile centre */
+   float reachFromCentre() {
+      return RANGE + this.hitSize / 2.0F + Vars.tilesize / 2.0F;
    }
 
    @Override

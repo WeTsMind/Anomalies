@@ -49,7 +49,7 @@ public class ArUxUnit extends UnitType {
       super(name);
       this.constructor = LegsUnit::create;
       this.alwaysUnlocked = true;
-      this.health = 7500.0F;
+      this.health = 1100.0F;
       this.armor = 8.0F;
       this.speed = 0.55F;
       this.accel = 0.2F;

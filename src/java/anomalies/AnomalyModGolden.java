@@ -108,7 +108,7 @@ public class AnomalyModGolden extends AnomalyModTurret {
          UnitType var2 = (UnitType)var1;
          ZigzagShot var3 = new ZigzagShot();
          var3.init();
-         var2.health = 1500.0F;
+         var2.health = 150.0F;
          Sound var4 = null;
 
          try {

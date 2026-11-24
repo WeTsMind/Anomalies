@@ -480,6 +480,8 @@ public class ExcavatorUnit extends UnitType {
 
       /** false: it does not press against the wall, it works from a distance (the laser crusher) */
       public boolean press = true;
+      /** a unit that works from a distance: how far from the wall centre it can still work, world units; 0 = none */
+      public float reach;
 
       public ExcavatorAI() {
       }
@@ -618,6 +620,11 @@ public class ExcavatorUnit extends UnitType {
                   super.commandPosition(new Vec2(st.worldx(), st.worldy()), false);
                   return;
                }
+            }
+            // a unit that works from a distance (the laser): when the wall drifted out of its reach (a leg step, a push),
+            // step closer again, straight to the wall
+            if (this.reach > 0.0F && !this.unit.within(this.cutTile.worldx(), this.cutTile.worldy(), this.reach - 2.0F)) {
+               this.moveTo(this.cutTile, this.reach - 5.0F);
             }
             // arrived: turn the saws to the wall and press against it (the wall stops the unit)
             this.unit.lookAt(this.cutTile.worldx(), this.cutTile.worldy());

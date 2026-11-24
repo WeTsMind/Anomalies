@@ -30,11 +30,11 @@ import java.util.WeakHashMap;
 public class GvozdikaUnit extends UnitType {
    /** legs: pivot (local units: x to the side, y forward) and the foot centre relative to the pivot */
    static final float[][] LEG_PIVOT = {{-1.25F, 1.5F}, {-1.5F, -1.25F}, {1.25F, 1.5F}, {1.5F, -1.25F}};
-   static final float[][] LEG_FOOT = {{-4.0F, 3.74F}, {-3.8F, -4.05F}, {4.05F, 3.8F}, {3.84F, -4.11F}};
+   static final float[][] LEG_FOOT = {{-4.27F, 4.01F}, {-4.05F, -4.3F}, {4.3F, 4.05F}, {4.07F, -4.33F}};
    /** how far the legs turn back while moving, degrees */
-   static final float LEG_TILT = 30.0F;
+   static final float LEG_TILT = 5.0F;
    /** how far all the legs swing towards the side the unit is turning to, degrees (at full turn speed) */
-   static final float LEG_TURN = 30.0F;
+   static final float LEG_TURN = 5.0F;
    /** how fast a leg turns to its angle, degrees per tick */
    static final float LEG_SPEED = 4.0F;
    static final Color HOVER = Color.valueOf("bf92f9");
@@ -76,7 +76,7 @@ public class GvozdikaUnit extends UnitType {
       Weapon gun = new Weapon("anomalies-gvozdika-gun");
       gun.x = 0.0F;
       gun.y = 0.0F;
-      gun.shootY = 10.5F; // the muzzle
+      gun.shootY = 10.75F; // the muzzle
       gun.mirror = false;
       gun.rotate = false;
       gun.reload = 60.0F; // 1 s
