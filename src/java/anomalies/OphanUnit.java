@@ -6,13 +6,14 @@ import mindustry.entities.bullet.BulletType;
 import mindustry.game.Team;
 import mindustry.gen.LegsUnit;
 import mindustry.gen.Unit;
+import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 import mindustry.type.UnitType;
 import mindustry.type.weapons.RepairBeamWeapon;
 import mindustry.world.blocks.storage.CoreBlock;
 
 /**
- * Ophan: a four-legged ground core unit (legs at the four corners of the hull). It walks over buildings, builds and mines,
+ * Ophan: a six-legged ground core unit, legs like the Merui's (front, middle and rear pair). It walks over buildings, builds and mines,
  * and while the fire button (LMB) is held two repair beams from the front of the hull heal the buildings towards the cursor.
  * Sprites are cut from ophan.ase (4 px = 1 world unit): ophan.png the hull, ophan-cell.png the team-coloured parts,
  * ophan-leg.png the inner leg part (hull to joint), ophan-leg-base.png the outer part with the foot (joint to foot).
@@ -33,19 +34,21 @@ public class OphanUnit extends UnitType {
       this.drawCell = true;
       this.engineSize = 0.0F;
 
-      // four legs, one at every corner of the hull
-      this.legCount = 4;
+      // legs built like the Merui: three pairs (front, middle and rear of each side, at 30, 90 and 150 degrees from the nose),
+      // walking in two groups of three; the outer part of every leg goes under the inner one
+      this.legCount = 6;
       this.legLength = 13.0F;
-      this.legGroupSize = 2;
+      this.legGroupSize = 3;
       this.lockLegBase = true;
       this.legContinuousMove = true;
-      this.legExtension = 1.25F;
+      this.legExtension = -2.0F;
       this.legBaseOffset = 3.0F;
       this.legMaxLength = 1.1F;
       this.legMinLength = 0.2F;
       this.legLengthScl = 0.96F;
-      this.legForwardScl = 0.8F;
+      this.legForwardScl = 1.1F;
       this.legMoveSpace = 1.0F;
+      this.legStraightness = 0.3F;
       this.legBaseUnder = true;
       this.legPhysicsLayer = false;
       this.allowLegStep = true;
@@ -53,6 +56,7 @@ public class OphanUnit extends UnitType {
       this.rippleScale = 0.2F;
       this.stepShake = 0.0F;
       this.shadowElevation = 0.1F;
+      this.groundLayer = Layer.legUnit - 1.0F;
 
       // builder / miner like the Emanate
       this.buildSpeed = 3.0F;
