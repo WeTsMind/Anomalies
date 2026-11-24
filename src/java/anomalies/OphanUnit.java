@@ -35,13 +35,16 @@ public class OphanUnit extends UnitType {
       this.engineSize = 0.0F;
 
       // legs built like the Merui: three pairs (front, middle and rear of each side, at 30, 90 and 150 degrees from the nose),
-      // walking in two groups of three; the outer part of every leg goes under the inner one
+      // walking in two groups of three, the inner part tucked under the hull and the outer part (with the foot) over the
+      // inner one; the legs are short like the Merui's, so both parts are squeezed along their length (never stretched)
+      // and the legs look bent down to the ground: inner 26 px into legLength / 2 = 4, outer 29 px into
+      // legLength / 2 + legExtension = 5
       this.legCount = 6;
-      this.legLength = 13.0F;
+      this.legLength = 8.0F;
       this.legGroupSize = 3;
       this.lockLegBase = true;
       this.legContinuousMove = true;
-      this.legExtension = -2.0F;
+      this.legExtension = 1.0F;
       this.legBaseOffset = 3.0F;
       this.legMaxLength = 1.1F;
       this.legMinLength = 0.2F;
@@ -49,7 +52,7 @@ public class OphanUnit extends UnitType {
       this.legForwardScl = 1.1F;
       this.legMoveSpace = 1.0F;
       this.legStraightness = 0.3F;
-      this.legBaseUnder = true;
+      this.legBaseUnder = false;
       this.legPhysicsLayer = false;
       this.allowLegStep = true;
       this.hovering = true;
