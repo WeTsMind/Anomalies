@@ -254,13 +254,13 @@ public class AlloyUnit extends UnitType {
    }
 
    void drawAll(Unit var1) {
-      // the cyan lines lie on the legs layer (z - 0.02), drawn before the unit so its own legs and hull cover them;
-      // the anomaly projector and the charging ball go on the body layer right after the hull (see UnitZ), so they sit on
-      // top of the hull but never float over other units
+      // everything goes on the body layer in drawing order (see UnitZ): the hull, then the cyan shield lines over it, then
+      // the anomaly projector over the start of the lines (so they come straight out of it), then the charging ball;
+      // they sit on top of the hull but never float over other units
       float z = UnitZ.of(this, var1);
-      this.drawUnder(var1, z - 0.02F);
       Draw.z(z);
       super.draw(var1);
+      this.drawUnder(var1, z);
       if (this.proj != null && this.proj.found()) {
          Draw.z(z);
          Draw.reset();
@@ -277,7 +277,7 @@ public class AlloyUnit extends UnitType {
       float var5 = var1.x + Mathf.cosDeg(var2) * 5.1042113F;
       float var6 = var1.y + Mathf.sinDeg(var2) * 5.1042113F;
       float var7 = 0.75F + 0.25F * Mathf.sin(Time.time * 0.5F);
-      // the lines start at the projector (the projector itself is drawn over the hull, in drawAll)
+      // the lines start at the projector centre; the projector is drawn over them right after (in drawAll)
       Draw.z(zUnder);
       Draw.reset();
       Draw.blend(Blending.additive);

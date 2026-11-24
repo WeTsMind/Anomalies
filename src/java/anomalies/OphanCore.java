@@ -16,7 +16,7 @@ import mindustry.world.Tile;
 import mindustry.world.blocks.storage.CoreBlock;
 import mindustry.world.meta.BuildVisibility;
 
-/** Core of the Ophan: the lids slide apart, the Ophan with folded wings is visible inside, it flies out and the core closes. */
+/** Core of the Ophan: the lids slide apart, the Ophan is visible inside, it walks out and the core closes. */
 public class OphanCore extends CoreBlock {
    /** how far the lids move between closed and open, world units */
    static final float SLIDE_L = 10.0F;
