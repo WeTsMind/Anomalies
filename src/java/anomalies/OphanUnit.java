@@ -104,36 +104,4 @@ public class OphanUnit extends UnitType {
    public Color cellColor(Unit unit) {
       return TeamTint.cell(unit);
    }
-
-   @Override
-   public void update(Unit unit) {
-      super.update(unit);
-      // while the lids open the unit sits inside the core (the core draws it); then it walks out
-      float age = SeraphAnim.age(unit);
-      if (age < SeraphAnim.OPEN_END) {
-         CoreBlock.CoreBuild c = unit.closestCore();
-         if (c != null) unit.set(c.x, c.y);
-         unit.vel.setZero();
-         unit.isShooting(false);
-      } else if (age < 1.0E8F && SeraphAnim.released.add(unit)) {
-         unit.impulse(0.0F, 1.5F);
-      }
-   }
-
-   @Override
-   public void draw(Unit unit) {
-      if (SeraphAnim.age(unit) < SeraphAnim.OPEN_END) return; // still inside the core, the core draws it
-      super.draw(unit);
-   }
-
-   /** The hull resting inside the core (drawn by the core, facing up). */
-   void drawInCore(float x, float y, Team team, float alpha) {
-      Draw.color(Color.white, alpha);
-      Draw.rect(this.region, x, y);
-      if (this.cellRegion.found()) {
-         Draw.color(team.color, alpha);
-         Draw.rect(this.cellRegion, x, y);
-      }
-      Draw.reset();
-   }
 }

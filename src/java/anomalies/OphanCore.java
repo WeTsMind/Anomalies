@@ -16,12 +16,8 @@ import mindustry.world.Tile;
 import mindustry.world.blocks.storage.CoreBlock;
 import mindustry.world.meta.BuildVisibility;
 
-/** Core of the Ophan: the lids slide apart, the Ophan is visible inside, it walks out and the core closes. */
+/** Core of the Ophan: a solid core that does not open; the Ophan spawns from it like from any core. */
 public class OphanCore extends CoreBlock {
-   /** how far the lids move between closed and open, world units */
-   static final float SLIDE_L = 10.0F;
-   static final float SLIDE_R = 9.5F;
-   TextureRegion base, lidL, lidR, teamL, teamR;
 
    public OphanCore(String name) {
       super(name);
@@ -36,11 +32,6 @@ public class OphanCore extends CoreBlock {
 
    public void load() {
       super.load();
-      this.base = Core.atlas.find(this.name + "-base");
-      this.lidL = Core.atlas.find(this.name + "-lid-left");
-      this.lidR = Core.atlas.find(this.name + "-lid-right");
-      this.teamL = Core.atlas.find(this.name + "-lid-left-team");
-      this.teamR = Core.atlas.find(this.name + "-lid-right-team");
       this.fixThrusters();
    }
 
@@ -118,25 +109,15 @@ public class OphanCore extends CoreBlock {
       return c != null && (Vars.state.rules.infiniteResources || c.items.has(this.requirements, Vars.state.rules.buildCostMultiplier));
    }
 
+   /** The core does not open: it is always drawn whole (the sprite and its team-coloured part). */
    public class OphanBuild extends CoreBlock.CoreBuild {
-      public float openStart = -1.0E9F;
-
       public void draw() {
-         float t = Time.time - this.openStart;
-         float open = SeraphAnim.lids(t);
-         Draw.rect(OphanCore.this.base, this.x, this.y);
-         if (t >= 0.0F && t < SeraphAnim.OPEN_END && OphanCore.this.unitType instanceof OphanUnit) {
-            ((OphanUnit)OphanCore.this.unitType).drawInCore(this.x, this.y, this.team, Mathf.clamp(open * 5.0F));
+         Draw.rect(OphanCore.this.region, this.x, this.y);
+         if (OphanCore.this.teamRegion != null && OphanCore.this.teamRegion.found()) {
+            Draw.color(this.team.color);
+            Draw.rect(OphanCore.this.teamRegion, this.x, this.y);
+            Draw.reset();
          }
-         float dl = (1.0F - open) * SLIDE_L, dr = -(1.0F - open) * SLIDE_R;
-         Draw.rect(OphanCore.this.lidL, this.x + dl, this.y);
-         Draw.color(this.team.color);
-         Draw.rect(OphanCore.this.teamL, this.x + dl, this.y);
-         Draw.reset();
-         Draw.rect(OphanCore.this.lidR, this.x + dr, this.y);
-         Draw.color(this.team.color);
-         Draw.rect(OphanCore.this.teamR, this.x + dr, this.y);
-         Draw.reset();
       }
    }
 }

@@ -17,10 +17,10 @@ import mindustry.world.blocks.storage.CoreBlock;
 import mindustry.world.meta.BuildVisibility;
 
 public class SeraphCore extends CoreBlock {
-   /** lid centres when closed, in world units from the core centre: the lids (42 and 44 px wide) sit flush with the outer edges of the 64 px core */
-   static final float LID_L = 2.75F, LID_R = 2.5F;
-   /** how far each lid slides out; leaves a 48 px gap, enough for the whole Seraph */
-   static final float OPEN = 8.75F;
+   /** the lids are full 96x96 canvases from seraph_core.ase, so when closed they sit right on the core centre */
+   static final float LID_L = 0.0F, LID_R = 0.0F;
+   /** how far each lid slides out; the lids overlap by 27 px, this leaves a ~48 px gap, enough for the whole Seraph */
+   static final float OPEN = 9.5F;
    TextureRegion seraphBase;
    TextureRegion seraphLidL;
    TextureRegion seraphLidR;
@@ -34,7 +34,7 @@ public class SeraphCore extends CoreBlock {
 
    public SeraphCore(String var1) {
       super(var1);
-      this.size = 2;
+      this.size = 3;
       this.health = 1500;
       this.itemCapacity = 4000;
       this.unitCapModifier = 8;
@@ -95,17 +95,18 @@ public class SeraphCore extends CoreBlock {
       public void draw() {
          float var0 = Time.time - this.openStart;
          float var1 = SeraphAnim.lids(var0) * OPEN;
-         Draw.rect(SeraphCore.this.seraphBase, this.x, this.y);
+         if (SeraphCore.this.seraphBase.found()) Draw.rect(SeraphCore.this.seraphBase, this.x, this.y);
          if (var0 >= 0.0F && var0 < SeraphAnim.OPEN_END) {
             this.drawSeraph(Mathf.clamp(var1 / OPEN * 5.0F));
          }
-         Draw.rect(SeraphCore.this.seraphLidL, this.x - LID_L - var1, this.y);
-         Draw.color(this.team.color);
-         Draw.rect(SeraphCore.this.seraphTeamL, this.x - LID_L - var1, this.y);
-         Draw.reset();
+         // right lid first: in seraph_core.ase the left lid lies over the right one
          Draw.rect(SeraphCore.this.seraphLidR, this.x + LID_R + var1, this.y);
          Draw.color(this.team.color);
          Draw.rect(SeraphCore.this.seraphTeamR, this.x + LID_R + var1, this.y);
+         Draw.reset();
+         Draw.rect(SeraphCore.this.seraphLidL, this.x - LID_L - var1, this.y);
+         Draw.color(this.team.color);
+         Draw.rect(SeraphCore.this.seraphTeamL, this.x - LID_L - var1, this.y);
          Draw.reset();
       }
 
