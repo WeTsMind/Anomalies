@@ -51,6 +51,7 @@ public class AnomalyMod extends Mod {
    public static Block goldCrucible;
    public static Block cryoMold;
    public static Block impactQuarry;
+   public static Block jackhammerDrill;
 
    /** White steam puffs rising from the cryogenic mold while it works. */
    static final Effect moldSteam = new Effect(70.0F, e -> {
@@ -172,6 +173,19 @@ public class AnomalyMod extends Mod {
 
       // impact quarry: after the ores and gold nuggets, it mines them and costs nuggets
       impactQuarry = new ImpactQuarry("impact-quarry");
+      // jackhammer drill: the same strikes, split ore and effects, but no fuel, slower, cheap, and its rhombus hammer rises before each strike
+      jackhammerDrill = new ImpactQuarry("jackhammer-drill") {{
+         this.requirements(Category.production, BuildVisibility.shown, ItemStack.with(new Object[]{Items.copper, 20}));
+         this.needsFuel = false;
+         this.health = 160;
+         this.rates.clear();
+         this.rates.put(Items.lead, 0.30F);
+         this.rates.put(Items.copper, 0.30F);
+         this.rates.put(AnomalyMod.gold, 0.20F);
+         this.rates.put(Items.sand, 0.60F);
+         this.rates.put(Items.coal, 0.60F);
+         this.rates.put(Items.scrap, 0.50F);
+      }};
    }
 
    public void init() {

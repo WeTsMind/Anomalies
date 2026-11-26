@@ -51,7 +51,11 @@ public class ImpactQuarry extends Block {
    public final ObjectFloatMap<Item> rates = new ObjectFloatMap<>();
    /** fuel in the order it is used: graphite first (more ore), then lead (faster), then copper */
    public Item[] fuels;
-   public TextureRegion topRegion;
+   /** false: works without any fuel (the jackhammer drill) */
+   public boolean needsFuel = true;
+   /** quarry: region = frame, -top = still top part. Jackhammer: -bottom under everything, -hammer the rhombus that
+    *  rises before each strike, region = frame drawn over it. */
+   public TextureRegion topRegion, bottomRegion, hammerRegion;
    static final Seq<Tile> tmpTiles = new Seq<>();
 
    /** dark grey dust rising over the quarry */
@@ -88,6 +92,8 @@ public class ImpactQuarry extends Block {
       this.rates.put(Items.lead, 0.77F);
       this.rates.put(Items.sand, 0.65F);
       this.rates.put(Items.coal, 0.65F);
+      this.rates.put(Items.titanium, 0.85F);
+      this.rates.put(Items.scrap, 0.55F);
       this.rates.put(AnomalyMod.gold, 0.75F);
       this.rates.put(AnomalyMod.polcim, 0.80F);
       this.rates.put(AnomalyMod.ruby, 0.68F);
@@ -99,17 +105,33 @@ public class ImpactQuarry extends Block {
    public void load() {
       super.load();
       this.topRegion = Core.atlas.find(this.name + "-top");
+      this.bottomRegion = Core.atlas.find(this.name + "-bottom");
+      this.hammerRegion = Core.atlas.find(this.name + "-hammer");
+   }
+
+   boolean layered() {
+      return this.bottomRegion != null && this.bottomRegion.found();
    }
 
    @Override
    protected TextureRegion[] icons() {
-      return new TextureRegion[]{this.region, this.topRegion};
+      return this.layered() ? new TextureRegion[]{this.bottomRegion, this.hammerRegion, this.region} : new TextureRegion[]{this.region, this.topRegion};
+   }
+
+   /** The "Drills:" panel of the vanilla drills: every floor/ore it mines with its rate. drillables shows
+    * 60 / (drillTime / multiplier) * size, so drillTime 60 and size 1 make it show exactly the rate from {@link #rates}. */
+   @Override
+   public void setStats() {
+      super.setStats();
+      this.stats.add(mindustry.world.meta.Stat.drillTier, mindustry.world.meta.StatValues.drillables(60.0F, 0.0F, 1.0F, this.rates,
+         b -> b instanceof mindustry.world.blocks.environment.Floor && !((mindustry.world.blocks.environment.Floor)b).wallOre
+            && b.itemDrop != null && this.rates.containsKey(b.itemDrop)));
    }
 
    @Override
    public void setBars() {
       super.setBars();
-      this.addBar("anomalies-quarry-fuel", (QuarryBuild b) -> new Bar(
+      if (this.needsFuel) this.addBar("anomalies-quarry-fuel", (QuarryBuild b) -> new Bar(
          () -> Core.bundle.format("anomalies.quarry.fuel", b.fuelTotal(), FUEL_CAPACITY),
          () -> b.fuelItem() == null ? Pal.remove : Pal.ammo,
          () -> b.fuelTotal() / (float)FUEL_CAPACITY));
@@ -196,7 +218,7 @@ public class ImpactQuarry extends Block {
 
       @Override
       public boolean acceptItem(Building source, Item item) {
-         if (source == this || this.fuelTotal() >= FUEL_CAPACITY) return false;
+         if (!ImpactQuarry.this.needsFuel || source == this || this.fuelTotal() >= FUEL_CAPACITY) return false;
          for (Item f : ImpactQuarry.this.fuels) {
             if (f == item) return true;
          }
@@ -228,14 +250,16 @@ public class ImpactQuarry extends Block {
       public void updateTile() {
          if (this.ores == null) this.countOres();
          this.dump();
-         int f = this.fuelIndex();
-         if (f < 0 || this.ores.length == 0) return;
-         float speed = ImpactQuarry.this.fuels[f] == Items.lead ? LEAD_SPEED : 1.0F;
+         if (this.ores.length == 0) return;
+         int f = ImpactQuarry.this.needsFuel ? this.fuelIndex() : -1;
+         if (ImpactQuarry.this.needsFuel && f < 0) return;
+         Item fuelItem = f < 0 ? null : ImpactQuarry.this.fuels[f];
+         float speed = fuelItem == Items.lead ? LEAD_SPEED : 1.0F;
          if (this.progress < 1.0F) {
             this.progress = Math.min(1.0F, this.progress + this.edelta() * speed / this.interval);
          }
          // strike only when the whole knocked-out ore fits
-         float bonus = ImpactQuarry.this.fuels[f] == Items.graphite ? GRAPHITE_BONUS : 1.0F;
+         float bonus = fuelItem == Items.graphite ? GRAPHITE_BONUS : 1.0F;
          if (this.progress >= 1.0F && this.items.total() + Mathf.ceil(MAX_ORE * bonus) <= ImpactQuarry.this.itemCapacity) {
             this.strike(f, bonus);
          }
@@ -243,7 +267,7 @@ public class ImpactQuarry extends Block {
 
       void strike(int f, float bonus) {
          this.progress = 0.0F;
-         this.fuel[f] -= FUEL_PER_STRIKE;
+         if (f >= 0) this.fuel[f] -= FUEL_PER_STRIKE;
          this.strikes++;
          this.lastStrike = Time.time;
          // same amount on every client: seeded by the building and the strike number
@@ -262,24 +286,42 @@ public class ImpactQuarry extends Block {
 
       @Override
       public void draw() {
-         Draw.rect(ImpactQuarry.this.region, this.x, this.y);
+         boolean layered = ImpactQuarry.this.layered();
+         Draw.rect(layered ? ImpactQuarry.this.bottomRegion : ImpactQuarry.this.region, this.x, this.y);
          // light grey shock wave spreading under the hammer
          float t = (Time.time - this.lastStrike) / SHOCK_TIME;
+         // round wave, a little above the blocks so it is seen over the neighbours too (reaches ~3 tiles from the centre),
+         // but still under this quarry's top part
          if (t >= 0.0F && t < 1.0F) {
+            float z = Draw.z();
+            Draw.z(Layer.block + 0.1F);
+            float rad = 4.0F + Mathf.pow(t, 0.55F) * 24.0F;
             Draw.color(shockColor, 1.0F - t);
-            Lines.stroke(2.2F * (1.0F - t) + 0.3F);
-            Lines.poly(this.x, this.y, 4, 3.0F + Mathf.pow(t, 0.6F) * 10.0F, 45.0F);
-            Draw.alpha(0.35F * (1.0F - t));
-            Fill.poly(this.x, this.y, 4, 2.0F + t * 8.0F, 45.0F);
+            Lines.stroke(2.6F * (1.0F - t) + 0.4F);
+            Lines.circle(this.x, this.y, rad);
+            Draw.alpha(0.25F * (1.0F - t));
+            Fill.circle(this.x, this.y, rad * 0.8F);
             Draw.reset();
+            Draw.z(z);
          }
-         // the hammer rises during the last fifth of the charge and drops on the strike
-         float lift = Mathf.clamp((this.progress - 0.8F) / 0.2F);
-         lift = lift * lift * (3.0F - 2.0F * lift);
-         float squash = t >= 0.0F && t < 0.4F ? 0.07F * (1.0F - t / 0.4F) : 0.0F;
-         float scl = 1.0F + 0.12F * lift - squash;
-         TextureRegion top = ImpactQuarry.this.topRegion;
-         Draw.rect(top, this.x, this.y, top.width * Draw.scl * scl, top.height * Draw.scl * scl);
+         float z0 = Draw.z();
+         Draw.z(Layer.block + 0.2F);
+         if (layered) {
+            // jackhammer: the rhombus rises (grows) over the last fifth of the charge, drops on the strike with a small squash,
+            // and the frame is drawn over it
+            float lift = Mathf.clamp((this.progress - 0.8F) / 0.2F);
+            lift = lift * lift * (3.0F - 2.0F * lift);
+            float squash = t >= 0.0F && t < 0.4F ? 0.1F * (1.0F - t / 0.4F) : 0.0F;
+            float scl = 1.0F + 0.25F * lift - squash;
+            TextureRegion h = ImpactQuarry.this.hammerRegion;
+            Draw.rect(h, this.x, this.y, h.width * Draw.scl * scl, h.height * Draw.scl * scl);
+            Draw.z(Layer.block + 0.3F);
+            Draw.rect(ImpactQuarry.this.region, this.x, this.y);
+         } else {
+            // quarry: the top part stays still, it fires a (not drawn) shell into the ground
+            Draw.rect(ImpactQuarry.this.topRegion, this.x, this.y);
+         }
+         Draw.z(z0);
       }
 
       @Override
