@@ -50,6 +50,7 @@ public class AnomalyMod extends Mod {
    public static Item stone;
    public static Block goldCrucible;
    public static Block cryoMold;
+   public static Block impactQuarry;
 
    /** White steam puffs rising from the cryogenic mold while it works. */
    static final Effect moldSteam = new Effect(70.0F, e -> {
@@ -168,6 +169,9 @@ public class AnomalyMod extends Mod {
             this.drawer = new DrawMulti(new DrawRegion("-bottom"), new DrawLiquidTile(AnomalyMod.liquidGold, 0.0F), new DrawDefault());
          }
       };
+
+      // impact quarry: after the ores and gold nuggets, it mines them and costs nuggets
+      impactQuarry = new ImpactQuarry("impact-quarry");
    }
 
    public void init() {
