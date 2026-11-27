@@ -39,7 +39,8 @@ import mindustry.world.meta.BuildVisibility;
  * Sprites from sprite01.ase: impact-quarry.png the frame, impact-quarry-top.png the hammer.
  */
 public class ImpactQuarry extends Block {
-   public static final int MIN_ORE = 15, MAX_ORE = 18;
+   /** ticks between strikes (10 s); each strike releases the ore mined over that time */
+   public static final float STRIKE_TIME = 600.0F;
    public static final int FUEL_PER_STRIKE = 5;
    public static final int FUEL_CAPACITY = 20;
    public static final float GRAPHITE_BONUS = 1.1F, LEAD_SPEED = 1.05F;
@@ -53,6 +54,10 @@ public class ImpactQuarry extends Block {
    public Item[] fuels;
    /** false: works without any fuel (the jackhammer drill) */
    public boolean needsFuel = true;
+   /** true: the hammer is drawn over the frame too (automatic impact drill), false: the frame covers it (jackhammer) */
+   public boolean hammerOnTop = false;
+   /** > 0: each strike needs this much power, stored in a buffer (consumePowerBuffered) that the grid fills between strikes */
+   public float powerPerStrike = 0.0F;
    /** quarry: region = frame, -top = still top part. Jackhammer: -bottom under everything, -hammer the rhombus that
     *  rises before each strike, region = frame drawn over it. */
    public TextureRegion topRegion, bottomRegion, hammerRegion;
@@ -115,7 +120,8 @@ public class ImpactQuarry extends Block {
 
    @Override
    protected TextureRegion[] icons() {
-      return this.layered() ? new TextureRegion[]{this.bottomRegion, this.hammerRegion, this.region} : new TextureRegion[]{this.region, this.topRegion};
+      if (!this.layered()) return new TextureRegion[]{this.region, this.topRegion};
+      return this.hammerOnTop ? new TextureRegion[]{this.bottomRegion, this.region, this.hammerRegion} : new TextureRegion[]{this.bottomRegion, this.hammerRegion, this.region};
    }
 
    /** The "Drills:" panel of the vanilla drills: every floor/ore it mines with its rate. drillables shows
@@ -195,9 +201,20 @@ public class ImpactQuarry extends Block {
          this.oreTiles = new int[this.ores.length];
          for (int k = 0; k < this.ores.length; k++) this.oreTiles[k] = counts.get(k);
          this.carry = new float[this.ores.length];
-         float meanRate = tiles == 0 ? 0.75F : rateSum / tiles;
-         this.interval = 60.0F * ((MIN_ORE + MAX_ORE) / 2.0F) / meanRate;
+         // one strike every 10 s; it releases what the quarry mined over those 10 s: rate * 10 s for a full 2x2 of that ore,
+         // so a tile gives a quarter of it
+         this.interval = STRIKE_TIME;
+         this.perStrike = new float[this.ores.length];
+         this.strikeTotal = 0.0F;
+         for (int k = 0; k < this.ores.length; k++) {
+            this.perStrike[k] = ImpactQuarry.this.rates.get(this.ores[k], 0.0F) * (STRIKE_TIME / 60.0F) * this.oreTiles[k] / (ImpactQuarry.this.size * ImpactQuarry.this.size);
+            this.strikeTotal += this.perStrike[k];
+         }
       }
+
+      /** ore released by one strike, per ore of {@link #ores}, and their sum */
+      float[] perStrike;
+      float strikeTotal;
 
       public int fuelTotal() {
          return this.fuel[0] + this.fuel[1] + this.fuel[2];
@@ -256,11 +273,16 @@ public class ImpactQuarry extends Block {
          Item fuelItem = f < 0 ? null : ImpactQuarry.this.fuels[f];
          float speed = fuelItem == Items.lead ? LEAD_SPEED : 1.0F;
          if (this.progress < 1.0F) {
-            this.progress = Math.min(1.0F, this.progress + this.edelta() * speed / this.interval);
+            // on power the efficiency is the buffer's fill level (0 right after a strike), so the charge runs on plain time
+            // and the strike just waits for a full buffer
+            float d = ImpactQuarry.this.powerPerStrike > 0.0F ? this.delta() : this.edelta();
+            this.progress = Math.min(1.0F, this.progress + d * speed / this.interval);
          }
          // strike only when the whole knocked-out ore fits
          float bonus = fuelItem == Items.graphite ? GRAPHITE_BONUS : 1.0F;
-         if (this.progress >= 1.0F && this.items.total() + Mathf.ceil(MAX_ORE * bonus) <= ImpactQuarry.this.itemCapacity) {
+         boolean charged = ImpactQuarry.this.powerPerStrike <= 0.0F || (this.power != null && this.power.status >= 0.999F);
+         if (this.progress >= 1.0F && charged && this.items.total() + Mathf.ceil(this.strikeTotal * bonus) + this.ores.length <= ImpactQuarry.this.itemCapacity) {
+            if (ImpactQuarry.this.powerPerStrike > 0.0F) this.power.status = 0.0F;
             this.strike(f, bonus);
          }
       }
@@ -270,11 +292,9 @@ public class ImpactQuarry extends Block {
          if (f >= 0) this.fuel[f] -= FUEL_PER_STRIKE;
          this.strikes++;
          this.lastStrike = Time.time;
-         // same amount on every client: seeded by the building and the strike number
-         float total = Mathf.randomSeed(this.id * 31L + this.strikes, MIN_ORE, MAX_ORE) * bonus;
-         float perTile = total / (ImpactQuarry.this.size * ImpactQuarry.this.size);
+         // the ore mined over the last 10 s; fractions are kept for the next strike
          for (int k = 0; k < this.ores.length; k++) {
-            float got = perTile * this.oreTiles[k] + this.carry[k];
+            float got = this.perStrike[k] * bonus + this.carry[k];
             int n = (int)got;
             this.carry[k] = got - n;
             if (n > 0) this.items.add(this.ores[k], n);
@@ -314,8 +334,9 @@ public class ImpactQuarry extends Block {
             float squash = t >= 0.0F && t < 0.4F ? 0.1F * (1.0F - t / 0.4F) : 0.0F;
             float scl = 1.0F + 0.25F * lift - squash;
             TextureRegion h = ImpactQuarry.this.hammerRegion;
+            Draw.z(Layer.block + (ImpactQuarry.this.hammerOnTop ? 0.3F : 0.2F));
             Draw.rect(h, this.x, this.y, h.width * Draw.scl * scl, h.height * Draw.scl * scl);
-            Draw.z(Layer.block + 0.3F);
+            Draw.z(Layer.block + (ImpactQuarry.this.hammerOnTop ? 0.2F : 0.3F));
             Draw.rect(ImpactQuarry.this.region, this.x, this.y);
          } else {
             // quarry: the top part stays still, it fires a (not drawn) shell into the ground

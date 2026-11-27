@@ -52,6 +52,7 @@ public class AnomalyMod extends Mod {
    public static Block cryoMold;
    public static Block impactQuarry;
    public static Block jackhammerDrill;
+   public static Block autoImpactDrill;
 
    /** White steam puffs rising from the cryogenic mold while it works. */
    static final Effect moldSteam = new Effect(70.0F, e -> {
@@ -172,7 +173,14 @@ public class AnomalyMod extends Mod {
       };
 
       // impact quarry: after the ores and gold nuggets, it mines them and costs nuggets
-      impactQuarry = new ImpactQuarry("impact-quarry");
+      // runs on power instead of fuel: 50 power units per strike, gathered in its buffer between strikes
+      impactQuarry = new ImpactQuarry("impact-quarry") {{
+         this.needsFuel = false;
+         // the rhombus cut out of the middle (impact-quarry-hammer) rises before each strike, over the arms
+         this.hammerOnTop = true;
+         this.powerPerStrike = 50.0F;
+         this.consumePowerBuffered(50.0F);
+      }};
       // jackhammer drill: the same strikes, split ore and effects, but no fuel, slower, cheap, and its rhombus hammer rises before each strike
       jackhammerDrill = new ImpactQuarry("jackhammer-drill") {{
          this.requirements(Category.production, BuildVisibility.shown, ItemStack.with(new Object[]{Items.copper, 20}));
@@ -185,6 +193,21 @@ public class AnomalyMod extends Mod {
          this.rates.put(Items.sand, 0.60F);
          this.rates.put(Items.coal, 0.60F);
          this.rates.put(Items.scrap, 0.50F);
+      }};
+      // automatic impact drill: like the jackhammer drill (no fuel, rising hammer), faster and takes titanium
+      autoImpactDrill = new ImpactQuarry("auto-impact-drill") {{
+         this.requirements(Category.production, BuildVisibility.shown, ItemStack.with(new Object[]{Items.copper, 30, Items.graphite, 15}));
+         this.needsFuel = false;
+         this.hammerOnTop = true;
+         this.health = 220;
+         this.rates.clear();
+         this.rates.put(Items.lead, 0.45F);
+         this.rates.put(Items.copper, 0.45F);
+         this.rates.put(AnomalyMod.gold, 0.35F);
+         this.rates.put(Items.sand, 0.78F);
+         this.rates.put(Items.coal, 0.78F);
+         this.rates.put(Items.scrap, 0.55F);
+         this.rates.put(Items.titanium, 0.30F);
       }};
    }
 
